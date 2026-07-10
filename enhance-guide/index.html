@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TheTwins AI — Enhancement Guide</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234C4F53'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='%23e1e6f1'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+  <style>
+    @font-face {
+      font-family: 'IBM Plex Mono';
+      src: url('../assets/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+      font-weight: 400; font-display: swap;
+    }
+    @font-face {
+      font-family: 'IBM Plex Mono';
+      src: url('../assets/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+      font-weight: 500; font-display: swap;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      background: #A0A5B1;
+      color: #4c4f53;
+      line-height: 1.65;
+      padding: clamp(40px, 8vh, 90px) clamp(20px, 6vw, 80px) 120px;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    .eyebrow {
+      font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
+      text-transform: uppercase; opacity: 0.65; margin-bottom: 14px;
+    }
+    h1 {
+      font-size: clamp(22px, 4vw, 34px); font-weight: 500;
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 10px;
+    }
+    .sub { font-size: 13px; opacity: 0.75; margin-bottom: 56px; }
+    h2 {
+      font-size: 12px; font-weight: 500; letter-spacing: 0.16em;
+      text-transform: uppercase; margin: 52px 0 16px;
+      padding-top: 22px; border-top: 1px solid rgba(76,79,83,0.25);
+    }
+    p, li { font-size: 13px; opacity: 0.85; }
+    ul { list-style: none; }
+    li { margin-bottom: 12px; padding-left: 18px; position: relative; }
+    li::before { content: '—'; position: absolute; left: 0; opacity: 0.5; }
+    code {
+      font-family: inherit; font-size: 12px;
+      background: rgba(225,230,241,0.55); padding: 1px 5px; border-radius: 3px;
+    }
+    .why { display: block; margin-top: 3px; font-size: 12px; opacity: 0.62; }
+    a { color: #3d4453; }
+    .back {
+      display: inline-block; margin-bottom: 60px;
+      font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
+      text-transform: uppercase; text-decoration: none;
+      border: 1px solid rgba(76,79,83,0.4); border-radius: 3px; padding: 10px 16px;
+    }
+    .back:hover { border-color: rgba(76,79,83,0.8); }
+    .vow {
+      margin-top: 70px; font-size: 12px; font-weight: 500;
+      letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="../">◂ Back to the site</a>
+    <div class="eyebrow">THETWINS AI · INTERNAL</div>
+    <h1>Enhancement Guide</h1>
+    <p class="sub">What changed in the elevation pass, and why. Nothing was rebuilt —
+    every section, every line of copy, and the world itself carried over untouched.
+    These are surgical enhancements on top of the finished film.</p>
+
+    <h2>01 · Hero choreography</h2>
+    <ul>
+      <li>The descriptive sub-copy no longer crosses the figure's legs — it now sits
+        below the open hands, in the clear band above the scroll cue.
+        <span class="why">Why: the site's own rule is "copy around the figure, never across it" —
+        the old <code>top: 68%</code> broke it on tall viewports.</span></li>
+      <li>Both hero lines gained a soft ice-light halo (<code>text-shadow</code>) and higher resting opacity.
+        <span class="why">Why: 12px mono over sunlit snow was dropping below comfortable contrast.</span></li>
+    </ul>
+
+    <h2>02 · HUD discipline</h2>
+    <ul>
+      <li>Past the film, the drifting coordinates, sequence readout and frame corners dim out;
+        they return when you scroll back into the world. Sound/autoplay stay usable at a whisper
+        and come to full voice on hover or focus.
+        <span class="why">Why: fixed telemetry was colliding with the manifesto's live text.</span></li>
+      <li>On phones the coordinates yield entirely — the sequence readout wins the one line available.
+        <span class="why">Why: both readouts overlapped in 375px viewports, printing garbage like
+        <code>134.41970W0%</code>.</span></li>
+      <li>Loader status thresholds fixed — the final line now actually displays
+        (the old integer math capped the index before the last message could show).</li>
+    </ul>
+
+    <h2>03 · The reading deck (specs → manifesto → footer)</h2>
+    <ul>
+      <li>Cold light now washes down into the specs section and pools at its edges;
+        the manifesto stands under a thin falling light-beam.
+        <span class="why">Why: after the cinematic world, the page fell into a flat grey void —
+        the atmosphere must never die.</span></li>
+      <li>Spec cells wake under the hand: the hairline glass brightens and the number
+        lifts with a cold glow. Counters race up with more drama and seat themselves
+        with a breath of light on arrival.</li>
+      <li>The manifesto's one warm phrase — <em>a human meant it</em> — draws its amber
+        underline the moment the page is read.</li>
+      <li>The footer's idle particles now orbit as a quiet banded halo instead of a
+        figure-eight scribble. Hovering any footer link still condenses them into that
+        link's relic (heart, key, dart, hourglass, beacon, lattice, twins).</li>
+    </ul>
+
+    <h2>04 · Glow UI — the pulse made literal</h2>
+    <ul>
+      <li>The 3D world publishes the human heartbeat (the same lub-dub driving the red gem)
+        to the page as a CSS variable, <code>--pulse</code>, every frame.</li>
+      <li>The HUD frame corners and the wordmark's star breathe with it — the whole
+        instrument shares one heartbeat with the world.
+        <span class="why">Why: this is the Glow UI concept executed with zero new assets —
+        pulse-reactive interface, driven by the story's own heart.</span></li>
+    </ul>
+
+    <h2>05 · Micro-interactions</h2>
+    <ul>
+      <li>Magnetic pull on nav links, social icons, footer links and HUD toggles —
+        they lean a few pixels toward the cursor and spring home elastically.</li>
+      <li>A fine survey ring drifts after the cursor and opens over anything interactive.
+        The native cursor is never hidden. Touch devices and reduced-motion users
+        never see either behaviour.</li>
+    </ul>
+
+    <h2>06 · Brand voice</h2>
+    <ul>
+      <li>The finalized tagline — <strong>YOUR TWIN. YOUR RULES.</strong> — now closes the
+        loader sequence (the last line read before the world opens) and anchors the
+        footer meta column. It appeared nowhere on the page before.</li>
+      <li>Palette, wordmark, logo treatment, copy, and the arctic monochrome discipline
+        (one red heart, one cyan signal, one amber warning) are untouched.</li>
+    </ul>
+
+    <h2>07 · What was deliberately NOT done</h2>
+    <ul>
+      <li>No WebGL text, no new fonts, no dark-void reskin, no generated video loops.
+        <span class="why">Why: the site's power is its real-time world and its DOM
+        accessibility (a real heading tree, skip links, focus rings — the axis where
+        igloo.inc conceded points). Generated video would fight the live renderer,
+        and the arctic-light identity is the brand, not a costume to swap.</span></li>
+    </ul>
+
+    <div class="vow">Your Twin. Your Rules.</div>
+  </main>
+</body>
+</html>

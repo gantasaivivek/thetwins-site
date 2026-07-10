@@ -1,0 +1,1071 @@
+/* ============================================================
+   THE TWINS — mystical-winter / interstellar instrument HUD
+   Design language: mono type, silvery ice over deep slate,
+   scroll-scrubbed hero, constant ambient drift.
+   ============================================================ */
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../assets/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('../assets/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+/* the wordmark voice — Trajan-class engraved Roman capitals (variable 400–900),
+   used ONLY for THE TWINS title so it stands as the brand against the mono HUD */
+@font-face {
+  font-family: 'Cinzel';
+  src: url('../assets/fonts/Cinzel-Var.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #A0A5B1;
+  --bg-deep: #23262c;
+  --slate: #6a6f7d;
+  --slate-dark: #4c4f53;
+  --ice-light: #e1e6f1;
+  --ice-blue: #d1e3ff;
+  --ice-mist: #d1d6e3;
+  --silver: #afb6c7;
+  --periwinkle: #a7b2d6;
+  --sky-glow: #b5d5ff;
+  --amber: #cda05e;
+  --ink: #4c4f53;
+
+  /* animated at runtime by the scroll timeline */
+  --hud-color: #4c4f53;
+  --hairline: rgba(76, 79, 83, 0.35);
+
+  /* Glow UI — the live heartbeat from the 3D world (0..1 lub-dub),
+     written per-frame by world.js; the HUD frame breathes with it */
+  --pulse: 0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: auto;
+}
+
+body {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  background-color: var(--bg);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+::selection { background: var(--slate-dark); color: var(--ice-light); }
+
+a { color: inherit; text-decoration: none; }
+
+/* keyboard path: a visible ≥2px focus ring on everything interactive
+   (hover-only affordances are invisible to keyboard users) */
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--slate-dark);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* skip link — first focusable element; hidden until keyboard focus */
+.skip-link {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translate(-50%, -250%);
+  z-index: 200;
+  padding: 14px 20px;
+  background: var(--ice-light);
+  color: var(--slate-dark);
+  border: 1px solid var(--slate-dark);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: transform 0.2s ease;
+}
+.skip-link:focus { transform: translate(-50%, 0); }
+
+/* ---------- micro-label voice ---------- */
+.loader-eyebrow, .loader-status, .hero-eyebrow, .anno-index, .anno-meta,
+.specs-head, .spec-label, .manifesto-eyebrow, .manifesto-sig,
+.topnav a, .footer-links a, .footer-col a, .footer-col-head, .footer-tag, .footer-meta,
+.auth-eyebrow, .auth-title, .auth-meta, .app-sector .sec-head, .app-chip .app-name,
+.hud-coords, .hud-progress, .scroll-cue span, .wordmark {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   LOADER
+   ============================================================ */
+#loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* the photoreal AI still is the opening frame — a full-bleed poster that
+   holds under the loader, then dissolves into the live WebGL scene */
+.loader-poster {
+  position: absolute;
+  inset: 0;
+  background: url('../assets/env/poster.jpg') center/cover no-repeat;
+  transform: scale(1.06);
+  animation: poster-drift 9s ease-out forwards;
+}
+.loader-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* lift the centre so the dark counter reads, keep the arctic edges */
+  background:
+    radial-gradient(120% 90% at 50% 46%, rgba(233,237,244,0.72), rgba(233,237,244,0.12) 62%, rgba(233,237,244,0) 100%),
+    linear-gradient(180deg, rgba(233,237,244,0.35), rgba(233,237,244,0.05) 40%, rgba(233,237,244,0.4));
+}
+@keyframes poster-drift {
+  from { transform: scale(1.06); }
+  to   { transform: scale(1.0); }
+}
+.loader-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  color: var(--slate-dark);
+}
+.loader-eyebrow { opacity: 0.65; }
+.loader-count {
+  font-size: clamp(64px, 12vw, 120px);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.loader-pct { font-size: 0.35em; vertical-align: super; opacity: 0.6; margin-left: 0.1em; }
+.loader-bar {
+  width: min(320px, 60vw);
+  height: 1px;
+  background: var(--hairline);
+  position: relative;
+  overflow: hidden;
+}
+#loader-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: var(--slate-dark);
+}
+.loader-status { opacity: 0.65; min-height: 14px; }
+.loader-frost {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0) 30%, rgba(255,255,255,0.9) 100%);
+  opacity: 0;
+}
+
+/* ============================================================
+   FIXED BACKDROP CANVASES
+   ============================================================ */
+#stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+}
+
+#figure {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: block;
+}
+/* #film canvas is injected by js/film.js at z-index 1 (between stars and figure) */
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+#topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px clamp(20px, 4vw, 48px);
+  color: var(--hud-color);
+  opacity: 0;
+}
+#topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: var(--hairline);
+  transform: scaleX(0);
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#topbar.scrolled::after { transform: scaleX(1); }
+.wordmark-star {
+  display: inline-block;
+  opacity: calc(0.55 + 0.45 * var(--pulse, 0));   /* the star carries the pulse */
+}
+.wordmark-ai {
+  display: inline-block;
+  font-size: 0.82em;
+  padding: 1px 4px;
+  margin: 0 1px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  opacity: 0.85;
+  vertical-align: 0.06em;
+}
+.topnav { display: flex; gap: clamp(18px, 3vw, 40px); }
+.topnav a, .footer-links a {
+  position: relative;
+  opacity: 0.75;
+  transition: opacity 0.3s ease;
+}
+/* invisible tap-target expansion — the 11px links keep their look but the
+   hit area grows toward the 44px touch minimum without moving the layout */
+.topnav a::before {
+  content: '';
+  position: absolute;
+  left: -8px; right: -8px;
+  top: -14px; bottom: -14px;
+}
+.topnav a::after, .footer-links a::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -4px;
+  width: 100%; height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.topnav a:hover, .footer-links a:hover { opacity: 1; }
+.topnav a:hover::after, .footer-links a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* ============================================================
+   HERO STAGE (pinned)
+   ============================================================ */
+#hero-stage {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+}
+.anchor-ghost { position: absolute; top: 0; }
+
+/* The hero copy is choreographed AROUND the figure, never across it:
+   the wordmark splits so THE sits left and TWINS sits right with the
+   crystalline human + glowing heart framed in the centre gap; the eyebrow
+   rides above the head and the sub-copy sits below the open hands.
+   --gap = half the clear centre column the figure stands in. */
+.hero-copy {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  color: var(--slate-dark);
+  pointer-events: none;
+  will-change: transform, opacity;
+  --gap: clamp(30px, 8vw, 152px);
+}
+.hero-eyebrow {
+  position: absolute;
+  left: 0; right: 0;
+  top: clamp(72px, 14%, 20%);
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+.hero-title {
+  position: absolute;
+  left: 50%;
+  top: 39%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 1em;
+  /* the one serif on the site — engraved Roman capitals, echoing the logo */
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: clamp(38px, 9vw, 116px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  color: var(--slate-dark);
+}
+.hero-title .ht-word {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+.hero-title .ht-left  { right: calc(50% + var(--gap)); }
+.hero-title .ht-right { left:  calc(50% + var(--gap)); }
+.hero-title .ch { display: inline-block; }
+/* the sub-copy sits BELOW the figure's feet — the body owns the centre
+   (the choreography rule: copy around the figure, never across it).
+   A soft ice-light halo lifts the small text off the bright snow. */
+.hero-sub {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 146px;
+  margin: 0 auto;
+  width: min(90vw, 720px);
+  text-align: center;
+  font-size: clamp(14px, 1.8vw, 18px);
+  letter-spacing: 0.06em;
+  opacity: 0.92;
+  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.9), 0 0 6px rgba(238, 243, 250, 0.65);
+}
+.hero-line {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 120px;
+  margin: 0 auto;
+  width: min(90vw, 720px);
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.68;
+  text-shadow: 0 1px 14px rgba(238, 243, 250, 0.9), 0 0 5px rgba(238, 243, 250, 0.6);
+}
+
+.scroll-cue {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--hud-color);
+  opacity: 0.7;
+}
+.scroll-cue-line {
+  width: 1px;
+  height: 44px;
+  background: currentColor;
+  display: block;
+  animation: cue-drop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform-origin: top;
+}
+@keyframes cue-drop {
+  0%   { transform: scaleY(0); transform-origin: top; }
+  45%  { transform: scaleY(1); transform-origin: top; }
+  55%  { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+
+/* ---------- leader-line annotation labels (positioned by world.js) ---------- */
+.anno {
+  position: absolute;
+  z-index: 36;
+  top: 0;
+  left: 0;
+  width: min(300px, 82vw);
+  color: #2b3038;
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+.anno-index { color: #5b6675; opacity: 1; margin-bottom: 10px; }
+.anno h2 {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  color: #23272e;
+}
+.anno p {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  opacity: 0.82;
+}
+
+/* telemetry readout rows — tiny instrument pairs, igloo-style */
+.anno-tel {
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* fixed label column + left-aligned value = tight instrument readout,
+   not two texts drifting to opposite edges of the card */
+.anno-tel div { display: grid; grid-template-columns: 92px auto; gap: 0 14px; align-items: baseline; }
+.anno-tel dt {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  opacity: 0.62;
+}
+.anno-tel dd {
+  margin: 0;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.anno-meta {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(43, 48, 56, 0.28);
+  opacity: 0.6;
+}
+
+/* explore-block telemetry labels live over the bright arctic fog.
+   At rest: a bare facet code floating above the block — no box, no noise.
+   On hover: the full instrument card materialises.
+   (.star-label.block-label: outranks the later .star-label light theme) */
+.star-label.block-label {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  color: #2b3038;
+  text-shadow: none;
+  padding: 8px 10px;
+  border-left: 1px solid transparent;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+.star-label.block-label .fct-name { font-style: normal; display: none; }
+.star-label.block-label.hot {
+  background: rgba(225, 230, 238, 0.55);
+  backdrop-filter: blur(3px);
+  border-left-color: rgba(43, 48, 56, 0.5);
+}
+.star-label.block-label.hot .fct-name { display: inline; }
+.star-label.block-label .block-tel {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #5b6675;
+  /* resting labels stay quiet — telemetry appears on hover (igloo rule) */
+  display: none;
+}
+.star-label.block-label.hot .block-tel { display: block; }
+.star-label.block-label .star-tag {
+  color: #2b3038;
+  border-color: rgba(43, 48, 56, 0.45);
+  /* out of LAYOUT at rest, not just invisible — otherwise the hidden tag
+     inflates offsetWidth and the resting code centres ~34px off its block */
+  display: none;
+}
+.star-label.block-label.hot .star-tag { display: inline-block; }
+.star-label.block-label.auth .star-tag {
+  color: #a04b3c;
+  border-color: rgba(160, 75, 60, 0.6);
+}
+
+/* app-star labels in the gateway galaxy */
+.star-label {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #dfe9ff;
+  text-shadow: 0 0 12px rgba(120, 180, 255, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.star-label .star-name { transition: opacity 0.25s ease; }
+.star-label .star-tag {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #8fd8ff;
+  border: 1px solid rgba(143, 216, 255, 0.4);
+  border-radius: 2px;
+  padding: 1px 5px;
+  opacity: 0;                       /* only the hovered / authorizing star shows it */
+  transition: opacity 0.25s ease;
+}
+.star-label.hot .star-tag { opacity: 1; }
+.star-label.auth .star-tag {
+  color: #ffd9a0;
+  border-color: rgba(255, 217, 160, 0.65);
+}
+
+/* ---- authorized-services panel (HUMAN-VERIFIED beat) ----
+   A compact grouped instrument of the daily apps the verified human
+   authenticates + authorizes, seated in the open gap between the identities;
+   each signs in one by one. Monochrome — the red heart stays the only colour. */
+#authfx {
+  position: fixed; inset: 0; z-index: 32;
+  width: 100%; height: 100%;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#authnet {
+  position: fixed; left: 0; top: 0;
+  z-index: 33; pointer-events: none;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 13px;
+  width: 210px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  will-change: transform, opacity;
+}
+.auth-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #5b6675; margin-bottom: 5px; }
+.auth-title { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: #23272e; line-height: 1.3; }
+.auth-head { margin-bottom: 1px; }
+.auth-meta {
+  align-self: stretch; margin-top: 3px; padding-top: 9px;
+  border-top: 1px solid rgba(43, 48, 56, 0.26);
+  font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: #5b6675; opacity: 0.7;
+}
+.app-sector { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.app-sector .sec-head {
+  font-size: 8px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: #6a7183;
+}
+.app-sector .sec-row { display: flex; gap: 9px; }
+/* glassmorphic app tile — a pane of frosted ice glass, not a flat card */
+.app-chip {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 62px; padding: 9px 7px 8px;
+  border-radius: 14px;
+  background: linear-gradient(157deg, rgba(255, 255, 255, 0.42) 0%, rgba(223, 233, 247, 0.10) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 22px rgba(28, 40, 64, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -12px 18px rgba(120, 148, 186, 0.05);
+  -webkit-backdrop-filter: blur(13px) saturate(1.25);
+  backdrop-filter: blur(13px) saturate(1.25);
+  opacity: 0.5;
+  transform: scale(0.92);
+  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.2, 1, 0.3, 1),
+              border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease;
+}
+/* the glyph rests in its own little glass well for depth */
+.app-chip .app-ico {
+  width: 30px; height: 30px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.44), rgba(204, 219, 238, 0.12));
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 2px rgba(30, 45, 70, 0.08);
+}
+.app-chip .app-ico svg { width: 18px; height: 18px; display: block; color: #5b636f; transition: color 0.5s ease; }
+.app-chip .app-name {
+  font-size: 7.5px; letter-spacing: 0.10em; text-transform: uppercase;
+  color: #767e8e; white-space: nowrap; transition: color 0.5s ease;
+}
+/* auth status: a glass pill with a sealed check — hidden until it signs in */
+.app-chip .app-auth {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px 2px 3px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: 7px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #3c4557; line-height: 1;
+  opacity: 0; transform: translateY(4px) scale(0.82);
+  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.app-chip .app-auth .auth-check {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #2b3240; color: #eef3fb; font-size: 6px; line-height: 1;
+  box-shadow: 0 0 5px rgba(96, 128, 175, 0.7);
+}
+.app-chip.authorized {
+  opacity: 1; transform: scale(1);
+  background: linear-gradient(157deg, rgba(255, 255, 255, 0.58) 0%, rgba(226, 236, 250, 0.18) 100%);
+  border-color: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 12px 30px rgba(38, 58, 98, 0.19),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -12px 20px rgba(120, 150, 195, 0.09);
+}
+.app-chip.authorized .app-ico svg { color: #232a34; }
+.app-chip.authorized .app-name { color: #3d4453; }
+.app-chip.authorized .app-auth { opacity: 1; transform: translateY(0) scale(1); }
+
+/* hairline leader lines */
+#leaders {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 35;
+  pointer-events: none;
+}
+#leaders path {
+  stroke: rgba(43, 48, 56, 0.62);
+  stroke-width: 1;
+  fill: none;
+  opacity: 0;
+}
+#leaders circle {
+  fill: #2b3038;
+  opacity: 0;
+}
+
+/* blurred ghost words in the fog */
+.ghost-text {
+  position: absolute;
+  z-index: 2;
+  font-weight: 500;
+  font-size: clamp(44px, 8vw, 110px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  filter: blur(7px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#ghost-1 { left: 5%; top: 20%; }
+#ghost-2 { right: 4%; top: 62%; }
+#ghost-3 { left: 10%; top: 58%; }
+
+/* end-of-journey whiteout */
+#whiteout {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: #dfe3ea;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* HUD dot grid */
+#dotgrid {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(70, 74, 84, 0.3) 1px, transparent 1.5px);
+  background-size: 26px 26px;
+  opacity: 0.45;
+}
+
+/* sound toggle */
+.hud-sound {
+  position: fixed;
+  left: 44px;
+  bottom: 44px;
+  z-index: 60;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--hud-color);
+  opacity: 0.65;
+  /* padding/negative-margin pair: 44px touch target, same visual seat */
+  padding: 14px;
+  margin: -14px;
+}
+.hud-sound:hover, .hud-sound:focus-visible { opacity: 1 !important; }  /* wins over the reading-deck whisper */
+/* autoplay toggle sits just right of the sound toggle */
+.hud-auto { left: auto; right: 44px; }
+.hud-auto[aria-pressed="true"] { opacity: 0.95; }
+.hud-auto[aria-pressed="true"]::before {
+  content: '';
+  position: absolute;
+  left: -12px; top: 50%;
+  width: 5px; height: 5px; margin-top: -2.5px;
+  border-radius: 50%;
+  background: #ff6a55;                         /* the one warm signal: the film is playing */
+  box-shadow: 0 0 7px rgba(255, 106, 85, 0.9);
+  animation: auto-pulse 2s ease-in-out infinite;
+}
+@keyframes auto-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+/* one-time invitation to enable sound */
+#sound-hint {
+  position: fixed;
+  left: 190px; bottom: 46px;
+  z-index: 60;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hud-color);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   SPECS
+   ============================================================ */
+/* the descent surfaces from the world into the instrument deck — the
+   atmosphere must NOT die here: cold light keeps washing down from above,
+   a faint mist breathes at the edges, the page still feels like the plain */
+#specs {
+  position: relative;
+  z-index: 2;
+  padding: clamp(90px, 14vh, 160px) clamp(20px, 6vw, 80px) clamp(70px, 10vh, 120px);
+  color: var(--slate-dark);
+  /* both washes live INSIDE the box and fade before its edges — a gradient
+     centred outside the section clips into a hard seam at the boundary */
+  background:
+    radial-gradient(1100px 480px at 50% -8%, rgba(238, 243, 250, 0.55), transparent 68%),
+    radial-gradient(640px 300px at 14% 78%, rgba(228, 234, 244, 0.3), transparent 68%);
+}
+.specs-head { opacity: 0.65; margin-bottom: 48px; }
+.specs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+  border-left: 1px solid rgba(76, 79, 83, 0.22);
+}
+.spec {
+  position: relative;
+  padding: 34px 26px 30px;
+  border-right: 1px solid rgba(76, 79, 83, 0.22);
+  border-bottom: 1px solid rgba(76, 79, 83, 0.22);
+  transition: background 0.5s ease;
+}
+/* instrument cell wakes under the hand — hairline sharpens, a cold light
+   pools in the glass, the number lifts */
+.spec::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(340px 200px at 50% 0%, rgba(244, 248, 255, 0.75), transparent 75%);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.spec:hover::after { opacity: 1; }
+.spec:hover .spec-num { text-shadow: 0 0 24px rgba(181, 213, 255, 0.65); }
+.spec-num {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate-dark);
+  transition: text-shadow 0.5s ease;
+}
+.spec-num em {
+  font-style: normal;
+  font-size: 0.35em;
+  opacity: 0.6;
+  margin-left: 4px;
+}
+.spec-label { position: relative; z-index: 1; margin-top: 14px; opacity: 0.68; }
+
+/* ============================================================
+   MANIFESTO
+   ============================================================ */
+#manifesto {
+  position: relative;
+  z-index: 2;
+  padding: clamp(110px, 18vh, 200px) clamp(20px, 6vw, 80px);
+  max-width: 940px;
+  margin: 0 auto;
+  color: var(--slate-dark);
+  text-align: center;
+}
+/* a thin cold beam falls onto the manifesto from above — the one lit page */
+#manifesto::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: clamp(50px, 9vh, 90px);
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(76, 79, 83, 0.4));
+}
+.manifesto-eyebrow { opacity: 0.65; margin-bottom: 40px; }
+.manifesto-text {
+  max-width: 30em;
+  margin: 0 auto;
+  font-size: clamp(18px, 2.6vw, 28px);
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+  opacity: 0.88;
+}
+/* the one warm phrase — an amber underline draws itself when the page is read */
+.manifesto-text .accent {
+  color: #a97e3c;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 96%;
+  background-size: 0% 1px;
+  transition: background-size 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.7s;
+}
+#manifesto.lit .manifesto-text .accent { background-size: 100% 1px; }
+.manifesto-sig {
+  margin-top: 52px;
+  color: #64748f;
+  opacity: 0.85;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+#footer {
+  position: relative;
+  z-index: 2;
+  color: var(--slate-dark);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+  padding: clamp(220px, 34vh, 320px) clamp(20px, 6vw, 80px) 130px;
+  overflow: hidden;
+  /* the bright finale — the descent ends in light, not dark */
+  background:
+    radial-gradient(900px 520px at 50% 18%, rgba(244, 248, 255, 0.85), transparent 70%),
+    linear-gradient(180deg, rgba(226, 231, 240, 0.0), rgba(232, 237, 246, 0.6));
+}
+#footerfx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+}
+.footer-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.8fr 1fr 1fr 1.1fr;
+  gap: 40px;
+  align-items: start;
+}
+.footer-tag { margin-top: 12px; opacity: 0.5; }
+.footer-col { display: flex; flex-direction: column; gap: 18px; }
+.footer-col a {
+  position: relative;
+}
+.footer-col a::before {
+  content: '';
+  position: absolute;
+  left: -8px; right: -8px;
+  top: -8px; bottom: -8px;
+}
+.footer-col-head {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+.footer-col a, .footer-links a { opacity: 0.78; width: fit-content; }
+
+/* social icon row */
+.footer-social {
+  display: flex;
+  gap: 18px;
+  margin-top: 26px;
+}
+.social {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(76, 79, 83, 0.28);
+  border-radius: 4px;
+  color: var(--slate-dark);
+  opacity: 0.65;
+  transition: opacity 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.social::before {
+  content: '';
+  position: absolute;
+  inset: -5px;               /* 34px box -> 44px touch target */
+}
+.social svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+.social:hover {
+  opacity: 1;
+  border-color: rgba(76, 79, 83, 0.6);
+  transform: translateY(-2px);
+}
+.footer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  text-align: right;
+}
+/* the vow — the finalized tagline closes the page at full voice */
+.footer-vow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--slate-dark);
+  opacity: 1;
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+.hud { pointer-events: none; }
+.hud-corner {
+  position: fixed;
+  z-index: 60;
+  width: 16px;
+  height: 16px;
+  opacity: calc(0.42 + 0.26 * var(--pulse, 0));   /* the frame beats with the heart */
+}
+.hud-tl { top: 14px; left: 14px; border-top: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
+.hud-tr { top: 14px; right: 14px; border-top: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
+.hud-bl { bottom: 14px; left: 14px; border-bottom: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
+.hud-br { bottom: 14px; right: 14px; border-bottom: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
+.hud-coords, .hud-progress {
+  position: fixed;
+  z-index: 60;
+  bottom: 22px;
+  color: var(--hud-color);
+  opacity: 0.68;
+  font-variant-numeric: tabular-nums;
+}
+.hud-coords { left: 44px; }
+.hud-progress { right: 44px; }
+
+/* ============================================================
+   CURSOR AURA — a fine survey ring drifting after the pointer
+   (native cursor stays visible; this is an aura, not a replacement)
+   ============================================================ */
+#cursor-ring {
+  position: fixed;
+  left: -11px;                       /* centre the 22px ring on (x, y) */
+  top: -11px;
+  z-index: 90;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(76, 79, 83, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              margin 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.35s ease;
+}
+#cursor-ring::after {                /* the survey dot at true centre */
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 2px;
+  margin: -1px 0 0 -1px;
+  border-radius: 50%;
+  background: rgba(76, 79, 83, 0.65);
+}
+#cursor-ring.hot {
+  width: 38px;
+  height: 38px;
+  margin: -8px 0 0 -8px;             /* keep the grown ring centred */
+  border-color: rgba(76, 79, 83, 0.85);
+}
+@media (pointer: coarse) {
+  #cursor-ring { display: none; }    /* no aura on touch, ever */
+}
+
+/* ============================================================
+   REVEAL HELPERS
+   ============================================================ */
+.reveal-line { overflow: hidden; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 900px) {
+  .specs-grid { grid-template-columns: repeat(2, 1fr); }
+  /* two columns before collapsing — the footer never leaves half the
+     viewport as dead air */
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .footer-brand { grid-column: 1 / -1; }
+  .footer-meta { grid-column: 1 / -1; text-align: left; }
+}
+@media (max-width: 560px) {
+  .footer-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .anno h2 { font-size: 13px; }
+  .anno p { font-size: 11px; line-height: 1.6; }
+  .ghost-text { font-size: clamp(30px, 11vw, 54px); }
+  .hud-sound { left: 40px; bottom: 40px; }
+  .hud-auto { left: auto; right: 40px; bottom: 40px; }
+  #sound-hint { display: none; }              /* no room beside the toggles on phones */
+  /* coords + progress cannot share a 375px line — the sequence readout wins,
+     the drifting coordinates yield (they return on wider screens) */
+  .hud-coords { display: none; }
+  .hud-progress { right: 40px; bottom: 16px; }
+  .scroll-cue { bottom: 22px; }
+  .topnav { gap: 12px; }
+  .topnav a { font-size: 9.5px; letter-spacing: 0.1em; }
+  .wordmark { font-size: 10px; letter-spacing: 0.1em; }
+
+  /* mobile: the figure fills the tall portrait frame, so the wordmark can't
+     flank it — it rides ABOVE the head as one centred line, and the
+     descriptive copy sits along the bottom, clear of the body. */
+  .hero-eyebrow { top: 7%; font-size: 10px; }
+  .hero-title {
+    top: 17%;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    gap: 0.32em;
+    font-size: clamp(38px, 13vw, 62px);
+  }
+  .hero-title .ht-left,
+  .hero-title .ht-right { position: static; }
+  .hero-sub  { top: auto; bottom: 16%; width: min(92vw, 420px); }
+  .hero-line { top: auto; bottom: 12%; width: min(92vw, 420px); }
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
