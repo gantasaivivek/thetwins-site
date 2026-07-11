@@ -1,7 +1,7 @@
 /* Footer particle field — idle swirl that coalesces into a MEANINGFUL shape
    when a footer link is hovered (the igloo.inc footer move): the five protocol
    emblems + the heart + the twins, not typed glyphs. Particles shift toward
-   the twin's signal-cyan with speed; the heart alone warms red. A soft glow
+   the twin's signal-gold with speed; the heart alone warms red. A soft glow
    surge marks each morph. */
 (function () {
   const canvas = document.getElementById('footerfx');
@@ -210,13 +210,13 @@
       p.y += p.vy * dt;
 
       const speed = Math.min(Math.hypot(p.vx, p.vy) / (3 * dpr), 1);
-      /* velocity → colour: still = slate, fast = the twin's signal cyan;
+      /* velocity → colour: still = slate, fast = the twin's signal GOLD;
          on the heart, stillness warms to the human red instead */
       let r, g, b;
       if (warm) {
         r = 178 - 92 * speed; g = 66 + 26 * speed; b = 50 + 60 * speed;
       } else {
-        r = 108 - 84 * speed; g = 114 - 4 * speed; b = 128 + 22 * speed;
+        r = 108 + 118 * speed; g = 114 + 52 * speed; b = 128 - 52 * speed;
       }
       const alpha = 0.35 + speed * 0.5 + glow * 0.2;
       ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(3)})`;

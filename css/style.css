@@ -670,6 +670,86 @@ a:focus-visible, button:focus-visible {
   pointer-events: none;
 }
 
+/* ============================================================
+   THE VOW — the ending title card. Words land one by one over
+   the white bloom, in sync with the narrator's read, and hold
+   over the final resting frame.
+   ============================================================ */
+#vow-type {
+  position: fixed;
+  inset: 0;
+  z-index: 28;                          /* above the whiteout (25), below dotgrid/HUD */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;            /* a lower-third title card — seated on the
+                                           open ice, clear of the figures above */
+  padding-bottom: clamp(84px, 13vh, 150px);
+  gap: clamp(11px, 2vh, 20px);
+  pointer-events: none;
+  opacity: 0;                           /* master fade driven by main.js */
+  visibility: hidden;
+}
+.vt {
+  font-size: clamp(18px, 2.7vw, 38px);
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--slate-dark);
+  /* a stronger ice halo — the line reads over snow AND over thin legs */
+  text-shadow: 0 1px 22px rgba(238, 243, 250, 0.98), 0 0 10px rgba(238, 243, 250, 0.85);
+  white-space: nowrap;
+}
+.vt-close { font-size: clamp(13px, 1.9vw, 25px); letter-spacing: 0.3em; opacity: 0.92; }
+.vt .vw {
+  display: inline-block;
+  font-style: normal;
+  opacity: 0;
+  transform: translateY(22px) scale(0.9);
+  filter: blur(8px);
+}
+.vt .vw.on {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition: opacity 0.4s ease, filter 0.45s ease,
+              transform 0.55s cubic-bezier(0.2, 1.4, 0.3, 1);   /* lands with a spring */
+}
+@media (prefers-reduced-motion: reduce) {
+  .vt .vw { transform: none; filter: none; }
+}
+@media (max-width: 640px) {
+  .vt { letter-spacing: 0.16em; }
+  #vow-type { gap: 14px; }
+}
+
+/* the vow, standing with its subjects at the vault beat — world-anchored
+   phrases in the finale title card's own voice (the reprise structure) */
+.sov-word {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 33;                          /* over the finale film, under the HUD */
+  font-size: clamp(12px, 1.45vw, 19px);
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--slate-dark);
+  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.95), 0 0 8px rgba(238, 243, 250, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+.sov-word-close {
+  letter-spacing: 0.3em;
+  font-size: clamp(11px, 1.2vw, 16px);
+}
+@media (max-width: 640px) {
+  .sov-word { letter-spacing: 0.18em; }
+  .sov-word-close { letter-spacing: 0.2em; }
+}
+
 /* HUD dot grid */
 #dotgrid {
   position: fixed;
@@ -928,6 +1008,20 @@ a:focus-visible, button:focus-visible {
   text-transform: uppercase;
   opacity: 0.6;
   text-align: right;
+}
+/* credits — quiet, structured, at the very end of the read */
+.footer-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(76, 79, 83, 0.18);
+}
+.footer-credits .credit-head {
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  opacity: 0.85;
 }
 /* the vow — the finalized tagline closes the page at full voice */
 .footer-vow {

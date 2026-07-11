@@ -267,6 +267,15 @@ const amberLight = new THREE.PointLight(0xcfe0ff, 0, 14, 2);
 amberLight.position.set(0, 1.2, 0.6);
 scene.add(amberLight);
 
+/* GOLDEN HOUR — while the vault stands, the world's light leans gold: the
+   sun lowers, the key warms, gold catches on the ice. Scroll-driven (the
+   visitor pulls the hour across the sky). Base/gold pairs are constants;
+   the update loop lerps between them — fog/HAZE stay untouched (the
+   one-constant contract) so no seam can open. */
+const KEY_BASE  = new THREE.Color(0xfff6ea), KEY_GOLD  = new THREE.Color(0xffddab);
+const RIM_BASE  = new THREE.Color(0xcfe2ff), RIM_GOLD  = new THREE.Color(0xffe7c2);
+const HEMI_BASE = new THREE.Color(0x66707f), HEMI_GOLD = new THREE.Color(0x7d7259);
+
 /* ---------------- reflective floor ---------------- */
 const FLOOR_L = new THREE.Color(0xb3bcc8), FLOOR_D = new THREE.Color(0x161b23);
 const floorMat = new THREE.MeshStandardMaterial({
@@ -735,26 +744,27 @@ matHuman.sheenColor = new THREE.Color(0xffd2bd);
 matHuman.emissive = new THREE.Color(0x3a1f24);  // the inner warmth stays — glow retained
 matHuman.emissiveIntensity = 0.16;
 
-/* the DIGITAL TWIN: the same premium crystal, tuned cool — lit from within by
-   the cyan signal. The colour of the inner glow is what tells the twins apart */
+/* the DIGITAL TWIN: the same premium crystal, cast in gold — the sovereign's
+   precious double. Platinum ice skin, molten gold burning in the depths; the
+   colour of the inner light is what tells the twins apart: blood vs bullion. */
 const matTwin = iceMaterial();
 chisel(matTwin);
 matTwin.transmission = 0.34;
-matTwin.roughness = 0.24;
+matTwin.roughness = 0.22;
 matTwin.ior = 1.4;
 matTwin.thickness = 1.5;
-matTwin.attenuationColor = new THREE.Color(0x74aecb);    // cool cyan signal in the depths — saturated
+matTwin.attenuationColor = new THREE.Color(0xc9a35e);    // molten gold in the depths — saturated
 matTwin.attenuationDistance = 0.6;
-matTwin.envMapIntensity = 0.55;
-matTwin.specularIntensity = 0.5;
-matTwin.clearcoat = 0.55;
-matTwin.clearcoatRoughness = 0.4;
-matTwin.iridescence = 0.38;
-matTwin.color = new THREE.Color(0x93aecb);    // cooler, bluer ice — the digital cast
-matTwin.sheen = 0.5;
-matTwin.sheenColor = new THREE.Color(0xc8e2ee);
-matTwin.emissive = new THREE.Color(0x122a36);
-matTwin.emissiveIntensity = 0.18;
+matTwin.envMapIntensity = 0.6;
+matTwin.specularIntensity = 0.6;
+matTwin.clearcoat = 0.6;
+matTwin.clearcoatRoughness = 0.32;
+matTwin.iridescence = 0.34;
+matTwin.color = new THREE.Color(0xaab0bc);    // platinum ice — the twin's metal cast
+matTwin.sheen = 0.6;
+matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
+matTwin.emissive = new THREE.Color(0x2c2007);
+matTwin.emissiveIntensity = 0.22;
 
 function fitInto(gltf, group, mat, mirror) {
   const src = gltf.scene;
@@ -815,32 +825,33 @@ loader.load('assets/models/twin.glb', (g) => { fitInto(g, figB, matTwin, true); 
     heart = { mesh, glow, light, gemMat, edgeMat };
   }
 
-  /* the twin's SIGNAL CORE — a faceted crystal in a cool electric cyan (the
-     digital signal, the twin's one colour), pulsing with a signal beat */
+  /* the twin's SIGNAL CORE — a faceted crystal of solid gold (the digital
+     signature, the twin's one colour), pulsing with a signal beat. Gold is
+     the twin's identity: the sovereign's mark, struck like a coin. */
   {
     const g = new THREE.Group();
     const gemGeo = new THREE.OctahedronGeometry(0.058, 0);
     const gemMat = new THREE.MeshPhysicalMaterial({
-      color: 0x4ec6ff, emissive: new THREE.Color(0x12a6ff), emissiveIntensity: 0.7,
-      metalness: 0.1, roughness: 0.12, flatShading: true, envMapIntensity: 1.2,
-      clearcoat: 0.5, clearcoatRoughness: 0.2,
+      color: 0xffc45e, emissive: new THREE.Color(0xdf8a10), emissiveIntensity: 0.7,
+      metalness: 0.85, roughness: 0.16, flatShading: true, envMapIntensity: 1.6,
+      clearcoat: 0.6, clearcoatRoughness: 0.18,
       transparent: true, opacity: 0.98, depthTest: false
     });
     const mesh = new THREE.Mesh(gemGeo, gemMat);
     const edgeMat = new THREE.LineBasicMaterial({
-      color: 0x8fe0ff, transparent: true, opacity: 0.7,
+      color: 0xffdf9e, transparent: true, opacity: 0.7,
       blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
     });
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), edgeMat);
     mesh.add(edges);
-    // tight saturated-cyan halo (only B/G hot) — stays cyan through bloom
+    // tight saturated-gold halo (R hot, G warm, B cold) — stays gold through bloom
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture('rgba(40,175,255,0.9)', 'rgba(40,175,255,0)'),
+      map: glowTexture('rgba(255,178,58,0.9)', 'rgba(255,178,58,0)'),
       transparent: true, depthTest: false, depthWrite: false,
       blending: THREE.AdditiveBlending, opacity: 0.4
     }));
     glow.scale.setScalar(0.2);
-    const light = new THREE.PointLight(0x2ba8ff, 0.32, 2.6, 2);
+    const light = new THREE.PointLight(0xffa53c, 0.32, 2.6, 2);
     g.add(mesh, glow, light);
     g.position.set(0.03, 1.27, 0.02);
     g.renderOrder = 10;
@@ -895,133 +906,409 @@ for (let i = 0; i < 2; i++) {
   shocks.push(s);
 }
 
-/* ---------------- The Centennial Vault — the heart, sealed in ice --------
-   Nothing opens and nothing drops away. Between the twins a block of glacial
-   ice forms in the air, and deep inside it — held like something precious
-   frozen in amber — a single warm-red heart goes on beating. The vault IS the
-   heart, kept safe for a hundred years. "Built to outlast the quantum era." */
+/* ---------------- The Centennial Vault — one human's sovereign seal ------
+   Between the twins a MONOLITH of void-black crystal calves up through the
+   ice — cut in the same facet language as the twins' own bodies, but struck
+   from night: deep obsidian glass, its fracture lines sealed with veins of
+   living gold that pulse to the owner's heartbeat (kintsugi — a life's
+   fractures, mended in gold). A brushed-platinum band girdles its waist; a
+   platinum seal ring lies in the ice at its base, engraved with the vow.
+   Deep inside, the owner's warm-red heart goes on beating. This is not an
+   object between the twins — it is the one thing the human OWNS outright:
+   their intent, under their key alone, held for a hundred years. */
 const vault = new THREE.Group();
-vault.position.set(0, 1.2, 0);
 vault.visible = false;
+let monoGeo = null;   // the hewn geometry — the crystal veins seed on its real surface
 {
-  /* the block of glacial ice — frosted enough that the heart within reads as
-     a soft warm core rather than a hard point; the one warmth in a cold world */
+  /* THE MONOLITH — a stretched icosahedral shard, every vertex displaced by
+     a deterministic hash so shared corners stay welded and every triangle
+     becomes a hard hewn facet (non-indexed = true flat shading) */
+  const h3 = (x, y, z) => {
+    const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  /* subdivision 2 (320 facets) with TWO octaves of displacement — a large
+     calved form carrying a fine vocabulary of chips and cleaves. Keyed to the
+     unit-sphere position so shared corners stay welded (watertight). */
+  monoGeo = new THREE.IcosahedronGeometry(1, 2).toNonIndexed();
+  {
+    const pos = monoGeo.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const kx = +v.x.toFixed(4), ky = +v.y.toFixed(4), kz = +v.z.toFixed(4);
+      const r = 1 + (h3(kx, ky, kz) - 0.5) * 0.40                      // the great form
+              + (h3(kx * 3.1, ky * 3.1, kz * 3.1) - 0.5) * 0.13;       // the chips
+      v.multiplyScalar(r);
+      /* calved-shard proportions: tall, narrow, slightly deeper than wide,
+         TAPERING toward a point above the shoulder — a shard, not a pillar
+         (the taper also keeps the summit clear of the annotation card) */
+      const yn = clamp01((v.y + 1) / 2);                               // 0 base .. 1 tip
+      const taper = 1 - 0.55 * Math.pow(Math.max(0, yn - 0.42) / 0.58, 1.35);
+      pos.setXYZ(i, v.x * 0.44 * taper, v.y * 1.42, v.z * 0.38 * taper);
+    }
+    monoGeo.computeVertexNormals();   // flat facets — the chisel is in the geometry
+    /* per-FACET tonal jitter (all three verts of a face share one value):
+       hewn ice never reflects evenly — without this the facets mirror the
+       sky uniformly and the whole mass reads as brushed aluminium */
+    const col = new Float32Array(pos.count * 3);
+    for (let f = 0; f < pos.count; f += 3) {
+      const t = 0.9 + h3(f * 0.618, 1.7, 3.9) * 0.2;                   // 0.90..1.10 — variety, kept luminous
+      const b = t * (0.99 + h3(f * 0.213, 7.7, 1.1) * 0.04);           // a whisper of blue variance
+      for (let k = 0; k < 3; k++) {
+        col[(f + k) * 3] = t * 0.97; col[(f + k) * 3 + 1] = t; col[(f + k) * 3 + 2] = b;
+      }
+    }
+    monoGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  }
+  /* VOID-BLACK crystal — a black object lives on its reflections, so the
+     bright arctic range mirrors in every facet as PLATINUM light-play while
+     the mass itself stays night-deep. Faint transmission keeps a glassy
+     depth (never matte stone); the gold-vein emissive map is the kintsugi —
+     it loads async and then breathes with the owner's heartbeat. */
   const iceMat = new THREE.MeshPhysicalMaterial({
-    color: 0xdae6f2, metalness: 0.0, roughness: 0.3,
-    transmission: 0.92, thickness: 0.7, ior: 1.31,
-    attenuationColor: new THREE.Color(0x86a0ba), attenuationDistance: 1.6,
-    clearcoat: 0.85, clearcoatRoughness: 0.2,
-    sheen: 0.6, sheenColor: new THREE.Color(0xbcd6ff), sheenRoughness: 0.45,
-    iridescence: 0.28, iridescenceIOR: 1.32,
-    specularIntensity: 1.0, envMapIntensity: 1.0,
+    color: 0x15171d, metalness: 0.3, roughness: 0.15,
+    vertexColors: true,
+    transmission: 0.12, thickness: 1.2, ior: 1.45,
+    attenuationColor: new THREE.Color(0x0d0a06), attenuationDistance: 0.6,
+    clearcoat: 1.0, clearcoatRoughness: 0.08,
+    sheen: 0.5, sheenColor: new THREE.Color(0xffe2b0), sheenRoughness: 0.4,
+    iridescence: 0.25, iridescenceIOR: 1.32,
+    specularIntensity: 1.2, envMapIntensity: 1.5,
+    emissive: new THREE.Color(0xffb54a), emissiveIntensity: 0,
     transparent: true
   });
-  const block = new THREE.Mesh(new THREE.BoxGeometry(0.58, 1.0, 0.5), iceMat);
-  block.rotation.y = 0.2;
-
-  /* an inner block, held within — the faintest internal facet so the ice reads
-     with real depth rather than a solid slab (a flaw frozen around the heart) */
-  const innerMat = new THREE.MeshPhysicalMaterial({
-    color: 0xc4d4e6, metalness: 0, roughness: 0.5,
-    transmission: 0.95, thickness: 0.3, ior: 1.28,
-    transparent: true, opacity: 0.5, depthWrite: false
+  texLoader.load('assets/env/ice-macro.jpg', (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2.5, 2.5);
+    iceMat.bumpMap = t; iceMat.bumpScale = 0.02;        // hairline fractures on every facet
+    iceMat.needsUpdate = true;
   });
-  const inner = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.62, 0.26), innerMat);
-  inner.rotation.set(0.14, -0.32, 0.06);
+  /* the GOLD VEINS — Higgsfield kintsugi macro as the emissive map: black
+     areas stay void, the gold filaments alone carry the glow. Until it
+     arrives, emissiveIntensity stays 0 (the update loop gates on veinsReady
+     so an unmapped emissive can never wash the whole mass orange). */
+  texLoader.load('assets/env/gold-veins.jpg', (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 2);
+    t.colorSpace = THREE.SRGBColorSpace;
+    iceMat.emissiveMap = t;
+    iceMat.needsUpdate = true;
+    vault.userData.veinsReady = true;
+  });
+  const block = new THREE.Mesh(monoGeo, iceMat);
+  block.position.y = 1.18;            // base bites ~0.2 below the plain — grounded, immovable
+  block.rotation.y = 0.32;
+  block.rotation.z = 0.035;           // the faintest lean — calved, not machined
 
-  /* crisp frost along every edge — the crystalline rim of a hewn block */
-  const edgeMat = new THREE.LineBasicMaterial({ color: 0xf0f6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(block.geometry), edgeMat);
+  /* the INNER CORE — a ghost of the monolith suspended inside itself: a
+     second, smaller hewn form whose additive edges read as deep internal
+     structure whenever the camera moves (real depth, not a decal) */
+  const coreGeo = monoGeo.clone();
+  const coreEdgeMat = new THREE.LineBasicMaterial({
+    color: 0xffd9a0, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const core2 = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeo, 24), coreEdgeMat);
+  core2.scale.setScalar(0.55);
+  core2.position.set(0.02, 1.24, 0);
+  core2.rotation.y = 0.9;
+
+  /* INTERNAL LIGHT SHAFTS — three tall additive blades rising from the base
+     through the heart: molten gold light living inside the black glass */
+  const shaftMats = [];
+  const shaftGroup = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.MeshBasicMaterial({
+      map: glowTexture('rgba(255,196,110,0.55)', 'rgba(255,196,110,0)'),
+      transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    });
+    const blade = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 2.3), m);
+    blade.position.set((i - 1) * 0.08, 1.22, (i - 1) * -0.05);
+    blade.rotation.y = 0.5 + i * 1.05;
+    shaftGroup.add(blade);
+    shaftMats.push(m);
+  }
+
+  /* FLOATING MICRO-SLIVERS — a slow orbit of solid-gold flecks circling the
+     monument like a court, catching the low sun (instanced, one draw call) */
+  const orbitMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffc978, metalness: 1.0, roughness: 0.24,
+    clearcoat: 0.5, clearcoatRoughness: 0.2,
+    emissive: new THREE.Color(0x7a4d0e), emissiveIntensity: 0.35,
+    envMapIntensity: 1.7, transparent: true, opacity: 0, depthWrite: false
+  });
+  const ORBITERS = 22;
+  const orbit = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1, 0), orbitMat, ORBITERS);
+  orbit.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  orbit.frustumCulled = false;
+  const orbitData = [];
+  {
+    let s2 = 41;
+    const rnd2 = () => { s2 = (s2 * 16807) % 2147483647; return s2 / 2147483647; };
+    for (let i = 0; i < ORBITERS; i++) {
+      orbitData.push({
+        /* the court stays INSIDE the figures' ring (they stand at ±0.92) —
+           a sliver drifting across a sovereign's face breaks the ceremony */
+        r: 0.6 + rnd2() * 0.26,
+        y: 0.45 + rnd2() * 1.9,
+        a0: rnd2() * Math.PI * 2,
+        sp: 0.05 + rnd2() * 0.075,           // slow — a monument's court, not a swarm
+        bob: 0.5 + rnd2() * 1.2,
+        s: 0.014 + rnd2() * 0.03,
+        rx: rnd2() * Math.PI * 2, ry: rnd2() * Math.PI * 2
+      });
+    }
+  }
+
+  /* KINTSUGI SEAMS — the major facet ridges traced in gold (30° threshold —
+     the great fracture lines of the mass, sealed and glowing, not a wireframe) */
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0xffc36b, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(monoGeo, 30), edgeMat);
+  edges.position.copy(block.position);
   edges.rotation.copy(block.rotation);
 
-  /* frost snowflake etchings suspended in the ice — a Higgsfield macro
-     photograph (white crystals on black) painted additively, so only the
-     snowflakes glow; two panes at different depths give parallax as it turns */
-  const frostTex = texLoader.load('assets/env/frost.jpg');
-  frostTex.colorSpace = THREE.SRGBColorSpace;
-  const frostMatA = new THREE.MeshBasicMaterial({
-    map: frostTex, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide
+  /* internal cleavage — two great fracture planes frozen inside the mass at
+     odd angles (real glacier ice, not etched decoration). They catch the low
+     sun as pale sheets when the camera moves. */
+  const fracMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf5e2c4, metalness: 0, roughness: 0.55,
+    transmission: 0.88, thickness: 0.1, ior: 1.28,
+    transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
   });
-  const frostMatB = frostMatA.clone();
-  const frostA = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.8), frostMatA);
-  frostA.position.set(0, 0, 0.13); frostA.rotation.y = 0.2; frostA.renderOrder = 11;
-  const frostB = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.7), frostMatB);
-  frostB.position.set(0.03, 0.05, -0.1); frostB.rotation.y = 0.55; frostB.renderOrder = 11;
+  const fracMatB = fracMat.clone();
+  const fracA = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 1.5), fracMat);
+  fracA.position.set(0.05, 1.25, 0.02); fracA.rotation.set(0.1, 0.9, 0.16);
+  const fracB = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), fracMatB);
+  fracB.position.set(-0.06, 1.0, -0.04); fracB.rotation.set(-0.14, -0.55, -0.1);
 
-  /* THE HEART, CRYSTALLIZED — a faceted gem of warm light (icosahedron cut),
-     the single point of colour, painted through the ice so it always glows
-     within. Flat shading + env reflections make each facet catch differently
-     as it turns; additive warm edges keep the cut crisp through the frost. */
-  const gemGeo = new THREE.IcosahedronGeometry(0.085, 0);
+  /* THE HEART, CRYSTALLIZED — the faceted ruby, the single point of colour,
+     painted through the ice so it always glows within. Saturated single-hue
+     red (only R runs hot) so the bloom keeps its COLOUR — never a pink wash. */
+  const gemGeo = new THREE.IcosahedronGeometry(0.095, 0);
   const gemMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffc9b4, metalness: 0.1, roughness: 0.12,
-    emissive: new THREE.Color(0xff6a55), emissiveIntensity: 0.55,
-    flatShading: true, envMapIntensity: 2.2,
-    clearcoat: 0.6, clearcoatRoughness: 0.25,
+    color: 0xff6a4a, metalness: 0.1, roughness: 0.14,
+    emissive: new THREE.Color(0xff3418), emissiveIntensity: 0.6,
+    flatShading: true, envMapIntensity: 1.1,
+    clearcoat: 0.5, clearcoatRoughness: 0.25,
     transparent: true, opacity: 0, depthTest: false
   });
   const hMesh = new THREE.Mesh(gemGeo, gemMat);
   hMesh.renderOrder = 12;
+  hMesh.position.y = 1.32;            // chest height, deep in the monolith's core
   hMesh.rotation.x = 0.35;
   const gemEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xffb49a, transparent: true, opacity: 0,
+    color: 0xff9a80, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
   });
   const gemEdges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), gemEdgeMat);
   gemEdges.renderOrder = 13;
   hMesh.add(gemEdges);
+  /* a tight, contained ember-halo — saturated red, small (the old 0.62-scale
+     warm-white sprite was the washed-out pink blob) */
   const hGlow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTexture('rgba(255,110,80,0.95)', 'rgba(255,110,80,0)'),
+    map: glowTexture('rgba(255,64,40,0.95)', 'rgba(255,64,40,0)'),
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0
   }));
-  hGlow.scale.setScalar(0.62); hGlow.renderOrder = 14;
+  hGlow.position.y = 1.32;
+  hGlow.scale.setScalar(0.34); hGlow.renderOrder = 14;
 
-  vault.add(block, inner, edges, frostA, frostB, hMesh, hGlow);
-  vault.userData = { iceMat, innerMat, edgeMat, hMesh, hGlow, gemMat, gemEdgeMat, frostMatA, frostMatB };
+  /* THE PLATINUM BAND — a brushed band girdling the shard's waist below the
+     heart, with a gold hairline set into it: the vault is not raw geology,
+     it is a KEPT object — banded, owned, maintained. Elliptical to match the
+     shard's cross-section, tilted with its lean. */
+  const bandMat = new THREE.MeshPhysicalMaterial({
+    color: 0xb6bcc7, metalness: 1.0, roughness: 0.3,
+    clearcoat: 0.6, clearcoatRoughness: 0.3,
+    envMapIntensity: 1.15, transparent: true, opacity: 0
+  });
+  const goldLineMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffc873, metalness: 1.0, roughness: 0.2,
+    emissive: new THREE.Color(0x8a5a12), emissiveIntensity: 0.4,
+    envMapIntensity: 1.6, transparent: true, opacity: 0
+  });
+  /* (a floating waist band was tried and cut — a calved shard has no true
+     centreline, so any ring reads as a hovering hoop. All the metalwork
+     lives at the base instead: the object is JEWELLED where it is HELD.) */
+
+  /* THE SEAL PLINTH — a low platinum ring the monolith stands in, its outer
+     wall engraved with the owner's vow (readable from the level camera —
+     a flat ground ring would foreshorten to nothing). This is the signature
+     detail: the vault belongs to SOMEONE, and their vow is struck in metal. */
+  const sealCanvas = document.createElement('canvas');
+  sealCanvas.width = 2048; sealCanvas.height = 128;
+  {
+    const g = sealCanvas.getContext('2d');
+    /* brushed platinum strip */
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, '#c6ccd6'); grad.addColorStop(0.45, '#e2e6ec');
+    grad.addColorStop(0.75, '#aab0bb'); grad.addColorStop(1, '#8f95a1');
+    g.fillStyle = grad; g.fillRect(0, 0, 2048, 128);
+    /* horizontal brushing */
+    g.globalAlpha = 0.14;
+    for (let y = 2; y < 126; y += 2.5) {
+      g.strokeStyle = (y % 5 < 2.5) ? '#7e8590' : '#f2f4f8';
+      g.lineWidth = 0.8;
+      g.beginPath(); g.moveTo(0, y); g.lineTo(2048, y); g.stroke();
+    }
+    g.globalAlpha = 1;
+    /* gold rims top + bottom */
+    g.fillStyle = '#c9974a';
+    g.fillRect(0, 0, 2048, 5); g.fillRect(0, 123, 2048, 5);
+    /* the engraved vow — exactly ONE vow scaled to span the strip, so it
+       wraps the ring seamlessly with no clipped or doubled characters */
+    const VOW = 'ONE HUMAN · ONE TWIN · EVERY AGENT ACCOUNTABLE · SEALED 2026—2126 · ';
+    g.font = '600 42px "IBM Plex Mono", monospace';
+    g.textBaseline = 'middle';
+    const vowW = g.measureText(VOW).width;
+    g.save();
+    g.scale(2048 / vowW, 1);
+    let x = 0;
+    for (const ch of VOW) {
+      /* engraved: dark cut + light lower bevel; interpuncts struck in gold */
+      g.fillStyle = 'rgba(250,252,255,0.55)';
+      g.fillText(ch, x, 66 + 2);
+      g.fillStyle = ch === '·' ? '#a5741f' : '#4d525c';
+      g.fillText(ch, x, 66);
+      x += g.measureText(ch).width;
+    }
+    g.restore();
+  }
+  const sealTex = new THREE.CanvasTexture(sealCanvas);
+  sealTex.colorSpace = THREE.SRGBColorSpace;
+  sealTex.anisotropy = 8;
+  sealTex.wrapS = THREE.RepeatWrapping;
+  const sealMat = new THREE.MeshPhysicalMaterial({
+    map: sealTex, metalness: 0.9, roughness: 0.34,
+    envMapIntensity: 1.1, transparent: true, opacity: 0
+  });
+  const sealRing = new THREE.Group();
+  {
+    /* engraved outer wall + platinum top cap + a gold inlay ring set into
+       the cap — the one line of gold in the metal, carrying the pulse */
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.84, 0.11, 96, 1, true), sealMat);
+    wall.position.y = 0.055;
+    const cap = new THREE.Mesh(new THREE.RingGeometry(0.60, 0.82, 96), bandMat);
+    cap.rotation.x = -Math.PI / 2;
+    cap.position.y = 0.111;
+    const inlay = new THREE.Mesh(new THREE.TorusGeometry(0.71, 0.008, 8, 96), goldLineMat);
+    inlay.rotation.x = Math.PI / 2;
+    inlay.position.y = 0.112;
+    sealRing.add(wall, cap, inlay);
+  }
+
+  /* GOLD MOTES — a whisper of gold dust rising around the vault while it
+     stands: tiny additive points drifting upward, reborn at the base */
+  const MOTES = 42;
+  const moteGeo = new THREE.BufferGeometry();
+  const motePos = new Float32Array(MOTES * 3);
+  const moteSeed = new Float32Array(MOTES);
+  {
+    let ms = 97;
+    const mrnd = () => { ms = (ms * 16807) % 2147483647; return ms / 2147483647; };
+    for (let i = 0; i < MOTES; i++) {
+      const a = mrnd() * Math.PI * 2, r = 0.35 + mrnd() * 0.55;
+      motePos[i * 3] = Math.cos(a) * r;
+      motePos[i * 3 + 1] = mrnd() * 2.6;
+      motePos[i * 3 + 2] = Math.sin(a) * r;
+      moteSeed[i] = mrnd();
+    }
+  }
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+  const moteMat = new THREE.PointsMaterial({
+    color: 0xffcf86, size: 0.016, sizeAttenuation: true,
+    map: glowTexture('rgba(255,205,130,1)', 'rgba(255,205,130,0)'),
+    transparent: true, opacity: 0, depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const motes = new THREE.Points(moteGeo, moteMat);
+  motes.frustumCulled = false;
+
+  vault.add(block, edges, core2, shaftGroup, orbit, fracA, fracB, hMesh, hGlow,
+            sealRing, motes);
+  vault.userData = {
+    iceMat, edgeMat, fracMat, fracMatB, hMesh, hGlow, gemMat, gemEdgeMat,
+    coreEdgeMat, shaftMats, orbit, orbitMat, orbitData, orbitDummy: new THREE.Object3D(),
+    bandMat, goldLineMat, sealMat, moteMat, motePos, moteSeed, moteGeo,
+    veinsReady: false
+  };
 }
 scene.add(vault);
 
-/* crystal GROWTH — the igloo.inc signature, in our facet language: faceted
-   shards accrete in veins over the block's surface as the vault forms, each
-   one scaling in on its own cue so the ice visibly GROWS rather than fades.
-   One InstancedMesh (single draw call), deterministic seeded walk. */
+/* the vault's light-threads — a dedicated overlay canvas (the auth canvas
+   zeroes its own opacity outside the auth beat, so it can't be shared) */
+const vaultFx = document.createElement('canvas');
+vaultFx.id = 'vaultfx';
+vaultFx.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:32;pointer-events:none;opacity:0;';
+document.body.appendChild(vaultFx);
+const vaultFxCtx = vaultFx.getContext('2d');
+
+/* THE VOW, STANDING WITH ITS SUBJECTS — as the vault rises, the three
+   phrases of the vow land in the world, each at the feet of the being it
+   names: ONE HUMAN under the human, ONE TWIN under the twin, EVERY AGENT
+   ACCOUNTABLE beneath the vault between them. They clear before the finale
+   title card repeats the same line at full voice — a promise made in the
+   world, then spoken to the visitor. */
+const sovWords = [
+  { text: 'ONE HUMAN.', at: 0.30, close: false },
+  { text: 'ONE TWIN.', at: 0.55, close: false },
+  { text: 'EVERY AGENT ACCOUNTABLE.', at: 0.80, close: true }
+].map((d) => {
+  const el = document.createElement('div');
+  el.className = 'sov-word' + (d.close ? ' sov-word-close' : '');
+  el.textContent = d.text;
+  el.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(el);
+  return { el, at: d.at };
+});
+
+/* GOLD ACCRETION — the igloo.inc growth signature, recast: molten-gold
+   nuggets accrete in veins over the black mass as the vault forms — the
+   kintsugi visibly SEALING itself instead of fading in. One InstancedMesh
+   (single draw call), deterministic seeded walk. */
 const vaultCrystals = (() => {
   const VEINS = 8, PER = 12, COUNT = VEINS * PER;
   const mat = new THREE.MeshPhysicalMaterial({
-    color: 0xdce8f4, metalness: 0, roughness: 0.16,
-    transmission: 0.72, thickness: 0.25, ior: 1.31,
-    iridescence: 0.3, iridescenceIOR: 1.32,
-    clearcoat: 0.6, clearcoatRoughness: 0.25,
-    envMapIntensity: 1.35, transparent: true, opacity: 0, depthWrite: false
+    color: 0xffd9a0, metalness: 0.95, roughness: 0.26,
+    emissive: new THREE.Color(0x8a5a12), emissiveIntensity: 0.4,
+    clearcoat: 0.5, clearcoatRoughness: 0.22,
+    envMapIntensity: 1.6, transparent: true, opacity: 0, depthWrite: false
   });
   const inst = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1, 0), mat, COUNT);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   inst.frustumCulled = false;
   let s = 7;
   const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const bx = 0.30, by = 0.51, bz = 0.26, rotY = 0.2;   // the block's half-extents + its set rotation
-  const cs = Math.cos(rotY), sn = Math.sin(rotY);
+  /* seed each vein on a real triangle of the hewn monolith: centroid + face
+     normal, transformed by the block's seat (y 1.18, ry 0.32, rz 0.035) */
+  const pos = monoGeo.attributes.position, nrm = monoGeo.attributes.normal;
+  const triCount = pos.count / 3;
+  const _e = new THREE.Euler(0, 0.32, 0.035);
+  const _q = new THREE.Quaternion().setFromEuler(_e);
+  const _p = new THREE.Vector3(), _n = new THREE.Vector3();
   const data = [];
   for (let v = 0; v < VEINS; v++) {
-    /* seed each vein on a random face of the block (in unrotated space) */
-    const face = (rnd() * 6) | 0;
-    let px = (rnd() * 2 - 1) * bx, py = (rnd() * 2 - 1) * by, pz = (rnd() * 2 - 1) * bz;
-    let nx = 0, ny = 0, nz = 0;
-    if (face === 0) { px = bx; nx = 1; } else if (face === 1) { px = -bx; nx = -1; }
-    else if (face === 2) { py = by; ny = 1; } else if (face === 3) { py = -by; ny = -1; }
-    else if (face === 4) { pz = bz; nz = 1; } else { pz = -bz; nz = -1; }
+    const tri = (rnd() * triCount) | 0;
+    _p.set(0, 0, 0); _n.set(0, 0, 0);
+    for (let k = 0; k < 3; k++) {
+      _p.x += pos.getX(tri * 3 + k) / 3; _p.y += pos.getY(tri * 3 + k) / 3; _p.z += pos.getZ(tri * 3 + k) / 3;
+      _n.x += nrm.getX(tri * 3 + k); _n.y += nrm.getY(tri * 3 + k); _n.z += nrm.getZ(tri * 3 + k);
+    }
+    _n.normalize();
+    let px = _p.x, py = _p.y, pz = _p.z;
+    const nx = _n.x, ny = _n.y, nz = _n.z;
     for (let i = 0; i < PER; i++) {
       const f = i / (PER - 1);
-      /* walk outward along the face normal with sideways drift — a frost vein */
-      const wob = 0.05 * (1 + f);
-      px += nx * 0.035 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(nx));
-      py += ny * 0.035 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(ny));
-      pz += nz * 0.035 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(nz));
-      const rx = px * cs - pz * sn, rz = px * sn + pz * cs;      // into the block's rotation
+      /* walk outward along the facet normal with sideways drift — a frost vein */
+      const wob = 0.045 * (1 + f);
+      px += nx * 0.03 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(nx));
+      py += ny * 0.03 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(ny));
+      pz += nz * 0.03 * f + (rnd() * 2 - 1) * wob * (1 - Math.abs(nz));
+      _p.set(px, py, pz).applyQuaternion(_q);                   // into the monolith's seat
       data.push({
-        x: rx, y: py, z: rz,
-        s: (0.075 - f * 0.048) * (0.7 + 0.6 * rnd()),
+        x: _p.x, y: _p.y + 1.18, z: _p.z,
+        s: (0.07 - f * 0.045) * (0.7 + 0.6 * rnd()),
         qx: rnd() * Math.PI * 2, qy: rnd() * Math.PI * 2,
         order: v / VEINS * 0.35 + f * 0.65                       // veins overlap as they spread
       });
@@ -1033,8 +1320,11 @@ const vaultCrystals = (() => {
 
 /* the heart's warmth leaking out of the ice onto the twins and the snow —
    the one warm light held in the scene */
-const quantumLight = new THREE.PointLight(0xff6a4a, 0, 3.4, 2);
-quantumLight.position.set(0, 1.2, 0);
+/* the heart's radiance — seated AT the gem, falloff contained INSIDE the
+   monolith so the warmth reads as a glowing core, never a splash on one
+   facet edge (the driver tracks it up the rise) */
+const quantumLight = new THREE.PointLight(0xff9440, 0, 2.2, 2);
+quantumLight.position.set(0, 1.32, 0);
 scene.add(quantumLight);
 
 /* ---------------- explore blocks (igloo portfolio pattern) ----------------
@@ -1800,8 +2090,15 @@ function update(time) {
     _proj.set(figB.position.x, 1.05, 0).project(camera);
     const twinY = (-_proj.y * 0.5 + 0.5) * Hp;
     const pw = authNet.offsetWidth || 200, ph = authNet.offsetHeight || 240;
-    const px = Math.min(rightX + 46, Wp - pw - 20);
-    const py = Math.max(74, Math.min(Hp - ph - 20, twinY - ph / 2));
+    let px = Math.min(rightX + 46, Wp - pw - 20);
+    let py = Math.max(74, Math.min(Hp - ph - 20, twinY - ph / 2));
+    /* narrow viewports: if the clamp would slide the panel ONTO the twin,
+       give up the side-seat and drop to the centre gap beneath the pair —
+       the placement that never crosses a body (the user's standing rule) */
+    if (px < rightX - 6) {
+      px = Math.max(12, (Wp - pw) / 2);
+      py = Math.max(74, Hp - ph - Math.round(Hp * 0.09));
+    }
     authNet.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px)`;
 
     /* heart surge — the source of authority swells, but restrained (the
@@ -1977,30 +2274,96 @@ function update(time) {
   amberLight.intensity = intent * 2.2;
   amberLight.position.x = 0;
 
-  /* the Centennial Vault: a block of glacial ice forms in the air between the
-     twins, the heart sealed and beating within it */
+  /* the Centennial Vault: a MONOLITH of void-black crystal calves up through
+     the plain between the twins, its gold seams beating with the sealed
+     heart. A monument does not float and does not spin — it RISES, then
+     stands. While it stands, the whole world's light leans GOLD. */
   const moatVis = moat * moatFade;
+  /* golden hour — scroll-reactive: the vault pulls the sun low and warm */
+  {
+    const gold = smooth(moatVis);
+    key.color.lerpColors(KEY_BASE, KEY_GOLD, gold * 0.85);
+    key.intensity = 3.8 + 0.45 * gold;
+    rim.color.lerpColors(RIM_BASE, RIM_GOLD, gold * 0.5);
+    hemi.groundColor.lerpColors(HEMI_BASE, HEMI_GOLD, gold * 0.6);
+  }
   vault.visible = moatVis > 0.01;
   if (vault.visible) {
     const ud = vault.userData;
     const grow = smooth(moatVis);
-    vault.position.y = 1.2 + Math.sin(time * 0.8) * 0.03;         // gentle float
-    vault.rotation.y = time * 0.16;                              // slow turn
-    vault.scale.setScalar(0.62 + 0.38 * grow);                   // crystallises into being
+    vault.position.y = -2.7 * (1 - grow);                        // sunk in the ice -> seated on it
+    vault.rotation.y = 0;
+    vault.scale.setScalar(1);
     const hb = heartbeat(time);
-    ud.iceMat.opacity = moatVis;
-    ud.innerMat.opacity = 0.5 * moatVis;
-    ud.edgeMat.opacity = 0.7 * moatVis;
-    ud.hMesh.material.opacity = moatVis;
-    ud.hMesh.scale.setScalar(1 + 0.2 * hb);
-    ud.hMesh.rotation.y = time * 0.45;                            // gem turns against the block — facet glints
-    ud.gemMat.emissiveIntensity = 0.4 + 0.9 * hb;                 // the ember breathes with the heartbeat
-    ud.gemEdgeMat.opacity = 0.55 * moatVis;
-    ud.frostMatA.opacity = (0.30 + 0.05 * hb) * moatVis;          // etched snowflakes shimmer faintly
-    ud.frostMatB.opacity = (0.22 + 0.04 * hb) * moatVis;
-    ud.hGlow.material.opacity = (0.4 + 0.45 * hb) * moatVis;
-    ud.hGlow.scale.setScalar(0.58 + 0.12 * hb);
-    quantumLight.intensity = moatVis * (1.1 + 1.2 * hb);          // the one warm light, glowing from within
+    ud.iceMat.opacity = Math.min(1, moatVis * 1.35);
+    /* the kintsugi breathes: gold seams + vein-map surge with every beat */
+    ud.edgeMat.opacity = (0.30 + 0.22 * hb) * moatVis;
+    if (ud.veinsReady) ud.iceMat.emissiveIntensity = (0.55 + 0.8 * hb) * moatVis;
+    ud.fracMat.opacity = 0.15 * moatVis;                          // internal cleavage, barely there
+    ud.fracMatB.opacity = 0.11 * moatVis;
+    /* the kept-object hardware: platinum band + gold hairline + seal ring */
+    ud.bandMat.opacity = moatVis;
+    ud.goldLineMat.opacity = moatVis;
+    ud.goldLineMat.emissiveIntensity = 0.3 + 0.5 * hb;            // the hairline carries the pulse
+    ud.sealMat.opacity = moatVis;
+    /* gold dust rising around the monument — reborn at the base */
+    {
+      const mp = ud.motePos, ms2 = ud.moteSeed;
+      for (let i = 0; i < ms2.length; i++) {
+        const speed = 0.10 + ms2[i] * 0.14;
+        mp[i * 3 + 1] = ((ms2[i] * 2.6 + time * speed) % 2.8);
+        mp[i * 3] += Math.sin(time * 0.5 + ms2[i] * 31) * 0.0006;
+        mp[i * 3 + 2] += Math.cos(time * 0.43 + ms2[i] * 17) * 0.0006;
+      }
+      ud.moteGeo.attributes.position.needsUpdate = true;
+      /* fade with height is baked into the glow texture; gate on the beat */
+      ud.moteMat.opacity = (0.32 + 0.18 * hb) * moatVis;
+    }
+    /* the heart ignores depth (it must glow THROUGH the ice) — so it has to
+       wait below the surface during the rise or it ghosts through the floor */
+    const heartUp = clamp01((vault.position.y + 1.32 - 0.35) / 0.5);
+    ud.hMesh.material.opacity = moatVis * heartUp;
+    ud.hMesh.scale.setScalar(1 + 0.16 * hb);
+    ud.hMesh.rotation.y = time * 0.45;                            // the gem turns in its socket — facet glints
+    ud.gemMat.emissiveIntensity = 0.5 + 0.55 * hb;                // the ember breathes with the heartbeat
+    ud.gemEdgeMat.opacity = 0.5 * moatVis * heartUp;
+    ud.hGlow.material.opacity = (0.24 + 0.22 * hb) * moatVis * heartUp;
+    ud.hGlow.scale.setScalar(0.30 + 0.06 * hb);
+    /* the heart's radiance rides the rise and beats — a glowing CORE that
+       lights the inner facets of the translucent mass from within */
+    quantumLight.position.y = vault.position.y + 1.32;
+    quantumLight.intensity = moatVis * heartUp * (1.3 + 1.1 * hb);
+
+    /* the inner ghost core breathes against the outer mass — deep structure */
+    ud.coreEdgeMat.opacity = (0.14 + 0.05 * hb) * moatVis * heartUp;
+
+    /* internal light shafts — volumetric blades waking from base to tip,
+       each on its own slow phase, all swelling faintly with the heartbeat */
+    for (let i = 0; i < ud.shaftMats.length; i++) {
+      ud.shaftMats[i].opacity =
+        (0.10 + 0.07 * Math.sin(time * 0.5 + i * 2.1) + 0.05 * hb) * moatVis * heartUp;
+    }
+
+    /* the monument's court — micro-shards in slow orbit, bobbing on their
+       own phases, drifting up with the rise */
+    {
+      const od = ud.orbitDummy;
+      for (let i = 0; i < ud.orbitData.length; i++) {
+        const d = ud.orbitData[i];
+        const a = d.a0 + time * d.sp;
+        od.position.set(
+          Math.cos(a) * d.r,
+          d.y + Math.sin(time * 0.4 + d.bob * 7.0) * 0.06,
+          Math.sin(a) * d.r
+        );
+        od.rotation.set(d.rx + time * 0.1, d.ry + time * 0.13, 0);
+        od.scale.setScalar(d.s * (0.4 + 0.6 * grow));
+        od.updateMatrix();
+        ud.orbit.setMatrixAt(i, od.matrix);
+      }
+      ud.orbit.instanceMatrix.needsUpdate = true;
+      ud.orbitMat.opacity = 0.8 * moatVis * heartUp;
+    }
 
     /* the shards ACCRETE — each scales in on its own cue as the vault grows,
        so the ice visibly crystallises over the block instead of fading in */
@@ -2017,8 +2380,87 @@ function update(time) {
     }
     inst.instanceMatrix.needsUpdate = true;
     mat.opacity = 0.85 * moatVis;
+
+    /* the vow lands in the world — each phrase at the feet of its subject,
+       blurring in as the vault grows, clearing before the finale title card */
+    {
+      const sp2v = smooth(splitPos);
+      const gm = smooth(moatVis);
+      /* clear BEFORE the finale film owns the frame (film full by 0.93) —
+         the vow title card is the only voice over the blaze */
+      const sovFade = (1 - seg(p, 0.922, 0.936)) * moatFade;
+      const anchors = [
+        [-GAP * sp2v - moat * 0.20, -0.02, 0.35],
+        [GAP * sp2v + moat * 0.20, -0.02, 0.35],
+        [0, 0.02, 0.92]
+      ];
+      for (let i = 0; i < sovWords.length; i++) {
+        const s = sovWords[i];
+        const w = clamp01((gm - s.at) / 0.16);
+        _proj.set(anchors[i][0], anchors[i][1], anchors[i][2]).project(camera);
+        if (!s.w && s.el.offsetWidth) s.w = s.el.offsetWidth;   // measured once, cached
+        const half = (s.w || 100) / 2;
+        /* clamp fully on-screen — on narrow viewports the figures stand at
+           the frame edges and the words must not clip away */
+        const sx = Math.max(half + 10, Math.min(innerWidth - half - 10,
+          (_proj.x * 0.5 + 0.5) * innerWidth));
+        const sy = (-_proj.y * 0.5 + 0.5) * innerHeight;
+        s.el.style.transform =
+          `translate3d(${sx.toFixed(1)}px, ${(sy + 12 + (1 - w) * 18).toFixed(1)}px, 0) translateX(-50%)`;
+        s.el.style.opacity = (w * sovFade).toFixed(3);
+        s.el.style.filter = w < 0.995 ? `blur(${((1 - w) * 7).toFixed(1)}px)` : 'none';
+      }
+    }
+
+    /* LIGHT-THREADS — the two sovereigns feed the sealed heart: a warm
+       blood-thread from the human's chest, a gold signal-thread from the
+       twin's, each with a slow pulse of light travelling inward. The vault
+       is not an object between them; it is OF them. */
+    if (figureLoaded && heartUp > 0.05) {
+      const Wp = innerWidth, Hp = innerHeight, DPR2 = Math.min(devicePixelRatio || 1, 2);
+      if (vaultFx.width !== Math.round(Wp * DPR2) || vaultFx.height !== Math.round(Hp * DPR2)) {
+        vaultFx.width = Math.round(Wp * DPR2); vaultFx.height = Math.round(Hp * DPR2);
+      }
+      const g2 = vaultFxCtx;
+      g2.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+      g2.clearRect(0, 0, Wp, Hp);
+      vaultFx.style.opacity = '1';
+      const toScreen = (x, y, z) => {
+        _proj.set(x, y, z).project(camera);
+        return [(_proj.x * 0.5 + 0.5) * Wp, (-_proj.y * 0.5 + 0.5) * Hp];
+      };
+      /* same seat formula as the figure block (those consts are block-scoped) */
+      const sp2 = smooth(splitPos);
+      const [hxs, hys] = toScreen(-GAP * sp2 - moat * 0.20, 1.27, 0);
+      const [txs, tys] = toScreen(GAP * sp2 + moat * 0.20, 1.27, 0);
+      const [vxs, vys] = toScreen(0, vault.position.y + 1.32, 0);
+      const thread = (x1, y1, cr, cg, cb, phase) => {
+        const base = (0.10 + 0.10 * hb) * moatVis * heartUp;
+        const midX = (x1 + vxs) / 2, midY = Math.min(y1, vys) - 26;   // a gentle lift
+        for (const [w, aMul] of [[2.6, 0.45], [1, 1]]) {              // soft under-glow + crisp line
+          g2.strokeStyle = `rgba(${cr},${cg},${cb},${(base * aMul).toFixed(3)})`;
+          g2.lineWidth = w;
+          g2.beginPath(); g2.moveTo(x1, y1); g2.quadraticCurveTo(midX, midY, vxs, vys); g2.stroke();
+        }
+        /* the travelling pulse — light flowing INTO the heart */
+        const pf = ((time * 0.3 + phase) % 1 + 1) % 1;
+        const u = 1 - pf, px = u * u * x1 + 2 * u * pf * midX + pf * pf * vxs,
+              py = u * u * y1 + 2 * u * pf * midY + pf * pf * vys;
+        const gr2 = g2.createRadialGradient(px, py, 0, px, py, 5);
+        gr2.addColorStop(0, `rgba(${cr},${cg},${cb},${(base * 2.2).toFixed(3)})`);
+        gr2.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+        g2.fillStyle = gr2;
+        g2.beginPath(); g2.arc(px, py, 5, 0, Math.PI * 2); g2.fill();
+      };
+      thread(hxs, hys, 255, 122, 92, 0.0);     // the human feeds it blood-warmth
+      thread(txs, tys, 255, 178, 64, 0.5);     // the twin feeds it gold signal
+    } else {
+      vaultFx.style.opacity = '0';
+    }
   } else {
     quantumLight.intensity = 0;
+    vaultFx.style.opacity = '0';
+    for (const s of sovWords) s.el.style.opacity = '0';
   }
 
   /* the gateway galaxy is retired — its sprites/labels stay dormant */
@@ -2075,7 +2517,9 @@ function update(time) {
   };
   const colA = figureLoaded && figA.visible ? columnOf(figA.position.x, 1.18, figA.position.z, 0.62, 30) : null;
   const colB = figureLoaded && figB.visible ? columnOf(figB.position.x, 1.18, figB.position.z, 0.62, 30) : null;
-  const colM = vault.visible ? columnOf(0, 1.2, 0, 0.42, 30) : null;
+  /* anchor the vault's column at its SUMMIT so the float-above fallback
+     clears the full stone, never ghosting the card onto the black mass */
+  const colM = vault.visible ? columnOf(0, 2.15, 0, 0.68, 34) : null;
   const keepouts = [];
   if (colA) keepouts.push([colA.a, colA.b]);
   if (colB) keepouts.push([colB.a, colB.b]);

@@ -156,6 +156,22 @@
   const annos = [$('#anno-1'), $('#anno-2'), $('#anno-3'), $('#anno-4'), $('#anno-5')];
   const hudPct = $('#hud-pct');
   const hudCoords = $('#hud-coords');
+  /* THE VOW — the ending title card over the whiteout */
+  const vowEl = $('#vow-type');
+  const vowWords = $$('#vow-type .vw');
+  let vowClock = 0, vowShown = false;
+  /* the words land on their OWN clock — scroll stops at the resting end, so
+     scroll-driven frames would freeze the line before the first word pops.
+     Sound on: keyed to the narrator's actual playhead. Sound off: a 4s read. */
+  function vowTick() {
+    if (!vowShown) return;
+    const live = window.__vowPlayhead?.();
+    const t01 = (live !== null && live !== undefined)
+      ? live
+      : (performance.now() - vowClock) / 4000;
+    for (const w of vowWords) w.classList.toggle('on', t01 >= +w.dataset.t);
+    if (t01 < 1.5) requestAnimationFrame(vowTick);   // self-stops once the line has fully landed
+  }
 
   // card visibility windows on the master progress line (fallback path).
   // snap points sit at each act's rest: hero, two twins, verified,
@@ -236,6 +252,28 @@
         const lat = (58.3019 - p * 12.4).toFixed(4);
         const lon = (134.4197 + p * 22.7).toFixed(4);
         hudCoords.textContent = `${lat}° N — ${lon}° W`;
+      }
+
+      /* THE VOW — the ending title card. Words land over the white bloom as
+         the narrator says them (sound on: keyed to her actual playhead;
+         sound off: the same line on a 4s internal read) and hold over the
+         final resting frame. Scrubbing back re-arms it. */
+      if (vowEl) {
+        const inVow = p > 0.956;
+        if (inVow && !vowShown) {
+          vowShown = true;
+          vowClock = performance.now();
+          requestAnimationFrame(vowTick);              // the line lands on its own clock
+        }
+        if (inVow) {
+          vowEl.style.visibility = 'visible';
+          vowEl.style.opacity = String(gsap.utils.clamp(0, 1, (p - 0.956) / 0.012));
+        } else if (vowShown) {
+          vowShown = false;                            // stops the ticker
+          vowEl.style.opacity = '0';
+          vowEl.style.visibility = 'hidden';
+          for (const w of vowWords) w.classList.remove('on');   // re-arm for the next pass
+        }
       }
 
       $('#topbar').classList.toggle('scrolled', p > 0.01);
@@ -373,6 +411,9 @@
     trigger: '#specs',
     start: 'top 88%',
     onEnter() {
+      /* the vow title card steps aside as the reading deck arrives (it is
+         position:fixed and would otherwise hang over the specs copy) */
+      if (vowEl) { vowEl.style.opacity = '0'; vowEl.style.visibility = 'hidden'; }
       gsap.to('.hud-coords, .hud-progress, .hud-corner', { opacity: 0, duration: 0.5, ease: 'power2.out' });
       /* live controls stay usable but whisper (full voice on hover/focus) */
       gsap.to('.hud-sound', { opacity: 0.22, duration: 0.5 });
@@ -383,6 +424,9 @@
       gsap.to('.hud-corner', { opacity: 0.55, duration: 0.6,
         onComplete() { gsap.set('.hud-corner', { clearProps: 'opacity' }); } });
       gsap.to('.hud-sound', { opacity: 0.65, duration: 0.6 });
+      /* returning to the film's resting end: the title card comes back
+         (progress is pinned at 1 there, so onUpdate can't restore it) */
+      if (vowEl && vowShown) { vowEl.style.visibility = 'visible'; vowEl.style.opacity = '1'; }
     }
   });
 
@@ -476,6 +520,16 @@
   window.SCENE_NARRATE = p => {           // called each frame from the scroll
     const sc = sceneForP(p);
     if (sc !== lastSceneKey) { lastSceneKey = sc; narrate(sc); }
+  };
+  /* the vow title card keys its word-pops to the narrator's playhead.
+     Returns 0..1 through the line while she's speaking it, else null
+     (exposed on window so the scroll driver stays TDZ-safe). */
+  window.__vowPlayhead = () => {
+    const a = narrAudio.vow;
+    if (currentNarrKey === 'vow' && a && !a.paused && isFinite(a.duration) && a.duration > 0) {
+      return a.currentTime / a.duration;
+    }
+    return null;
   };
 
   /* text-reveal accent — a warm cinematic swell (low tone + a faint
