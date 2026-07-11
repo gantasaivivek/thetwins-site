@@ -785,10 +785,18 @@
     const open = () => {
       if (!modal) return;
       modal.hidden = false;
+      /* double rAF: the browser must paint the hidden→flex frame before the
+         .open transition can play (transitions retarget, so open/close is
+         interruptible by construction) */
+      requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
       try { stopAuto(); } catch (_) { /* autoplay not armed yet */ }
-      setTimeout(() => nameIn && nameIn.focus(), 60);
+      setTimeout(() => nameIn && nameIn.focus(), 240);
     };
-    const close = () => { if (modal) modal.hidden = true; };
+    const close = () => {
+      if (!modal) return;
+      modal.classList.remove('open');
+      setTimeout(() => { modal.hidden = true; }, 200);   // matches the opacity exit
+    };
     cta && cta.addEventListener('click', open);
     closeBtn && closeBtn.addEventListener('click', close);
     modal && modal.addEventListener('click', (e) => { if (e.target === modal) close(); });

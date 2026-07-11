@@ -43,6 +43,11 @@
   --gold: #a5741f;
   --gold-bright: #c9974a;
   --gold-glow: rgba(201, 151, 74, 0.55);
+  /* motion tokens — strong curves for entrances/landings; built-in `ease`
+     deliberately stays for hover/colour changes */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-spring: cubic-bezier(0.2, 1.4, 0.3, 1);   /* the vow's landing curve */
   --sky-glow: #b5d5ff;
   --amber: #cda05e;
   --ink: #4c4f53;
@@ -100,7 +105,7 @@ a:focus-visible, button:focus-visible {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s var(--ease-out);
 }
 .skip-link:focus { transform: translate(-50%, 0); }
 
@@ -276,9 +281,11 @@ a:focus-visible, button:focus-visible {
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .topnav a:hover, .footer-links a:hover { opacity: 1; }
-.topnav a:hover::after, .footer-links a:hover::after {
-  transform: scaleX(1);
-  transform-origin: left;
+@media (hover: hover) and (pointer: fine) {
+  .topnav a:hover::after, .footer-links a:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
 }
 
 /* ============================================================
@@ -611,7 +618,7 @@ a:focus-visible, button:focus-visible {
   backdrop-filter: blur(13px) saturate(1.25);
   opacity: 0.5;
   transform: scale(0.92);
-  transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.2, 1, 0.3, 1),
+  transition: opacity 0.5s ease, transform 0.55s var(--ease-out),
               border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease;
 }
 /* the glyph rests in its own little glass well for depth */
@@ -749,8 +756,8 @@ a:focus-visible, button:focus-visible {
   opacity: 1;
   transform: translateY(0) scale(1);
   filter: blur(0);
-  transition: opacity 0.4s ease, filter 0.45s ease,
-              transform 0.55s cubic-bezier(0.2, 1.4, 0.3, 1);   /* lands with a spring */
+  transition: opacity 0.4s var(--ease-out), filter 0.45s var(--ease-out),
+              transform 0.55s var(--ease-spring);               /* lands with a spring */
 }
 @media (prefers-reduced-motion: reduce) {
   .vt .vw { transform: none; filter: none; }
@@ -788,7 +795,7 @@ a:focus-visible, button:focus-visible {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.5s ease, transform 0.5s ease, border-color 0.3s ease;
+  transition: opacity 0.45s var(--ease-out), transform 0.45s var(--ease-out), border-color 0.3s ease;
 }
 .claim-cta.on { opacity: 1; pointer-events: auto; transform: translateX(-50%); }
 .claim-cta:hover { border-color: var(--gold-bright); color: #23272e; }
@@ -804,8 +811,21 @@ a:focus-visible, button:focus-visible {
   background: rgba(160, 165, 177, 0.4);
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
 }
 #claim-modal[hidden] { display: none; }
+#claim-modal.open { opacity: 1; }
+/* the panel rises and settles — nothing appears from nothing */
+#claim-modal .claim-panel {
+  transform: scale(0.96) translateY(8px);
+  opacity: 0;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+}
+#claim-modal.open .claim-panel {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
 .claim-panel {
   position: relative;
   width: min(420px, 88vw);
@@ -870,9 +890,16 @@ a:focus-visible, button:focus-visible {
   border: 1px solid var(--gold-bright);
   border-radius: 1px;
   cursor: pointer;
-  transition: background 0.3s ease, color 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease, transform 160ms var(--ease-out);
 }
 .claim-seal:hover { background: rgba(201, 151, 74, 0.14); color: #23272e; }
+
+/* press feedback — controls depress under the pointer, ~3%, and spring back */
+.claim-seal:active,
+.claim-x:active,
+.hud-sound:active { transform: scale(0.97); }
+.claim-cta.on:active { transform: translateX(-50%) scale(0.97); }
+.social:active { transform: translateY(-1px) scale(0.97); }
 .claim-x {
   position: absolute;
   top: 10px;
@@ -886,6 +913,7 @@ a:focus-visible, button:focus-visible {
   cursor: pointer;
   opacity: 0.6;
   padding: 6px 8px;
+  transition: opacity 0.25s ease, transform 160ms var(--ease-out);
 }
 .claim-x:hover { opacity: 1; }
 @media (max-width: 640px) {
@@ -946,6 +974,7 @@ a:focus-visible, button:focus-visible {
   /* padding/negative-margin pair: 44px touch target, same visual seat */
   padding: 14px;
   margin: -14px;
+  transition: opacity 0.3s ease, transform 160ms var(--ease-out);
 }
 .hud-sound:hover, .hud-sound:focus-visible { opacity: 1 !important; }  /* wins over the reading-deck whisper */
 /* autoplay toggle sits just right of the sound toggle */
@@ -1172,7 +1201,11 @@ a:focus-visible, button:focus-visible {
 .social:hover {
   opacity: 1;
   border-color: rgba(76, 79, 83, 0.6);
-  transform: translateY(-2px);
+}
+/* hover MOVEMENT only for real pointers — touch taps leave sticky false
+   hovers, and a stuck levitation reads as state corruption */
+@media (hover: hover) and (pointer: fine) {
+  .social:hover { transform: translateY(-2px); }
 }
 .footer-meta {
   display: flex;
