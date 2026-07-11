@@ -729,6 +729,38 @@ function chisel(mat, k = 3.0) {
    not faceted crystal. chisel() is retired for the bodies (the hard normal
    quantization read as low-poly); the premium is in polish: clearcoat,
    sheen, and the inner light. */
+/* PULSE WAVE — one pulse, two bodies. With every lub-dub a band of light
+   washes through the glass body, radiating from the heart's seat: the pulse
+   itself made visible ("your pulse, your proof"). Injected as an emissive
+   band in world-space distance from the heart — geometry-independent, so
+   it flows down limbs and torso alike. */
+function pulseWave(mat, tint) {
+  const u = {
+    uHeartW: { value: new THREE.Vector3(0, 1.27, 0) },
+    uWaveR: { value: 0 },
+    uWaveAmp: { value: 0 },
+    uPulseTint: { value: new THREE.Color(tint) }
+  };
+  mat.userData.pulse = u;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPulseW;')
+      .replace('#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvPulseW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>',
+        '#include <common>\nvarying vec3 vPulseW;\nuniform vec3 uHeartW;\nuniform float uWaveR;\nuniform float uWaveAmp;\nuniform vec3 uPulseTint;')
+      .replace('#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        {
+          float dP = distance(vPulseW, uHeartW);
+          float band = exp(-pow((dP - uWaveR) * 4.0, 2.0));
+          totalEmissiveRadiance += uPulseTint * band * uWaveAmp;
+        }`);
+  };
+}
+
 const matHuman = iceMaterial();
 matHuman.transmission = 0.34;          // translucent, but with enough body to hold colour + form
 matHuman.roughness = 0.18;
@@ -768,6 +800,10 @@ matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming 
 matTwin.emissive = new THREE.Color(0x33260a);
 matTwin.emissiveIntensity = 0.3;
 
+/* the human's blood-warm pulse; the twin's golden echo of the same beat */
+pulseWave(matHuman, 0xff5a3a);
+pulseWave(matTwin, 0xffb44e);
+
 function fitInto(gltf, group, mat, mirror) {
   const src = gltf.scene;
   const box = new THREE.Box3().setFromObject(src);
@@ -805,75 +841,40 @@ loader.load('assets/models/twin-hd.glb',
     undefined, (err) => console.warn('twin.glb:', err?.message || err)));
 
 {
-  /* the human's HEART — a faceted ruby crystal (same cut language as the vault
-     gem), painted through the ice so it always glows within; beats lub-dub */
-  {
+  /* ONE PULSE, TWO BODIES — no gems, no geometry. Each chest holds a heart
+     of pure LIGHT: a bright asymmetric double-nucleus (organic, faintly
+     anatomical) inside a deeper halo. The human's burns blood-red and
+     LAUNCHES a visible pulse-wave through the glass with every lub-dub;
+     the twin's is an exact GOLDEN MIRROR beating ~0.22s later — the twin
+     has no heart of its own; it carries yours, received as light. */
+  const lightHeart = (fig, hot, cold, lightColor) => {
     const g = new THREE.Group();
-    const gemGeo = new THREE.IcosahedronGeometry(0.05, 0);
-    const gemMat = new THREE.MeshPhysicalMaterial({
-      color: 0xff6a4a, emissive: new THREE.Color(0xff3418), emissiveIntensity: 0.7,
-      metalness: 0.1, roughness: 0.14, flatShading: true, envMapIntensity: 1.1,
-      clearcoat: 0.5, clearcoatRoughness: 0.25,
-      transparent: true, opacity: 0.98, depthTest: false
-    });
-    const mesh = new THREE.Mesh(gemGeo, gemMat);
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: 0xff9a80, transparent: true, opacity: 0.5,
-      blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
-    });
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), edgeMat);
-    mesh.add(edges);
-    // tight, SATURATED-red halo — a red bloom keeps its colour (only R is hot);
-    // the old warm-white halo pushed all channels up and clipped to a white blob
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture('rgba(255,64,40,0.95)', 'rgba(255,64,40,0)'),
+    const nucMat = new THREE.SpriteMaterial({
+      map: glowTexture(hot, cold),
       transparent: true, depthTest: false, depthWrite: false,
-      blending: THREE.AdditiveBlending, opacity: 0.5
-    }));
-    glow.scale.setScalar(0.22);
-    const light = new THREE.PointLight(0xff4a2a, 0.35, 2.6, 2);
-    g.add(mesh, glow, light);
-    g.position.set(0.03, 1.27, 0.02);
-    g.renderOrder = 10;
-    mesh.renderOrder = 10; edges.renderOrder = 11; glow.renderOrder = 11;
-    figA.add(g);
-    heart = { mesh, glow, light, gemMat, edgeMat };
-  }
-
-  /* the twin's SIGNAL CORE — a faceted crystal of solid gold (the digital
-     signature, the twin's one colour), pulsing with a signal beat. Gold is
-     the twin's identity: the sovereign's mark, struck like a coin. */
-  {
-    const g = new THREE.Group();
-    const gemGeo = new THREE.OctahedronGeometry(0.058, 0);
-    const gemMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffc45e, emissive: new THREE.Color(0xdf8a10), emissiveIntensity: 0.7,
-      metalness: 0.85, roughness: 0.16, flatShading: true, envMapIntensity: 1.6,
-      clearcoat: 0.6, clearcoatRoughness: 0.18,
-      transparent: true, opacity: 0.98, depthTest: false
+      blending: THREE.AdditiveBlending, opacity: 0.8
     });
-    const mesh = new THREE.Mesh(gemGeo, gemMat);
-    const edgeMat = new THREE.LineBasicMaterial({
-      color: 0xffdf9e, transparent: true, opacity: 0.7,
-      blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
-    });
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), edgeMat);
-    mesh.add(edges);
-    // tight saturated-gold halo (R hot, G warm, B cold) — stays gold through bloom
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture('rgba(255,178,58,0.9)', 'rgba(255,178,58,0)'),
+    const nucleus = new THREE.Sprite(nucMat);
+    nucleus.position.set(-0.012, 0.008, 0);
+    nucleus.scale.setScalar(0.085);
+    const lobe = new THREE.Sprite(nucMat);              // shares the material — one drive
+    lobe.position.set(0.017, -0.013, 0);
+    lobe.scale.setScalar(0.055);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTexture(hot.replace('1)', '0.95)'), cold),
       transparent: true, depthTest: false, depthWrite: false,
       blending: THREE.AdditiveBlending, opacity: 0.4
     }));
-    glow.scale.setScalar(0.2);
-    const light = new THREE.PointLight(0xffa53c, 0.32, 2.6, 2);
-    g.add(mesh, glow, light);
+    halo.scale.setScalar(0.22);
+    const light = new THREE.PointLight(lightColor, 0.32, 2.6, 2);
+    nucleus.renderOrder = 12; lobe.renderOrder = 12; halo.renderOrder = 11;
+    g.add(nucleus, lobe, halo, light);
     g.position.set(0.03, 1.27, 0.02);
-    g.renderOrder = 10;
-    mesh.renderOrder = 10; edges.renderOrder = 11; glow.renderOrder = 11;
-    figB.add(g);
-    core = { mesh, glow, light, gemMat, edgeMat };
-  }
+    fig.add(g);
+    return { nucMat, nucleus, lobe, halo, light };
+  };
+  heart = lightHeart(figA, 'rgba(255,96,64,1)', 'rgba(255,52,24,0)', 0xff4a2a);
+  core = lightHeart(figB, 'rgba(255,182,66,1)', 'rgba(255,150,30,0)', 0xffa53c);
 }
 
 /* heartbeat: two-bump "lub-dub" cycle */
@@ -884,16 +885,9 @@ function heartbeat(t) {
   return lub + dub;
 }
 
-/* signal beat: the digital twin's pulse — a crisp transmitted ping with a
-   fast echo tick and a faint continuous carrier hum. Faster and sharper than
-   the organic heart, so it reads as a data signal, not a heartbeat. */
-function signalbeat(t) {
-  const c = (t % 0.9) / 0.9;
-  const ping = Math.exp(-Math.pow((c - 0.06) / 0.028, 2));
-  const tick = 0.4 * Math.exp(-Math.pow((c - 0.22) / 0.02, 2));
-  const carrier = 0.1 * (0.5 + 0.5 * Math.sin(t * 9.0));   // the link is always live
-  return Math.min(1.1, ping + tick) + carrier;
-}
+/* (the twin's separate "signal beat" is retired — one pulse, two bodies:
+   the twin's golden heart is heartbeat(t - 0.22), the human's own beat
+   received as light across the link.) */
 
 /* faint ground-glow rings (pedestal) */
 const ringMat = new THREE.MeshBasicMaterial({ color: 0xdfe9ff, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -2069,32 +2063,47 @@ function update(time) {
   chromaPass.uniforms.uSpace.value = 0;
   chromaPass.uniforms.uTime.value = time;
 
-  /* the human's heart beats lub-dub; the twin's signal core pulses its own
-     digital beat — both glowing continuously the whole way through */
+  /* ONE PULSE, TWO BODIES — the human's heart of light beats lub-dub and a
+     pulse-wave washes through the glass; ~0.22s later the twin's golden
+     mirror answers with the SAME beat, received as light. */
   if (heart && core) {
     const hb = heartbeat(time);
+    const eb = heartbeat(time - 0.22);                  // the echo — your beat, arrived
     /* Glow UI — the DOM breathes with the heart: HUD corners and the wordmark
        star consume --pulse in CSS, so the whole instrument shares one pulse */
     if (!REDUCED) document.documentElement.style.setProperty('--pulse', hb.toFixed(3));
-    heart.glow.material.opacity = (0.22 + 0.26 * hb) * humanAlpha;   // tight halo, never a white disc
-    heart.glow.scale.setScalar(0.18 + 0.05 * hb);
-    heart.mesh.material.opacity = 0.98 * humanAlpha;
-    heart.mesh.scale.setScalar(1 + 0.16 * hb);
-    heart.mesh.rotation.y = time * 0.5;                 // facets catch the light as it turns
-    heart.gemMat.emissiveIntensity = 0.55 + 0.6 * hb;   // a lit ruby core, controlled
-    heart.edgeMat.opacity = (0.3 + 0.35 * hb) * humanAlpha;
-    heart.light.intensity = (0.22 + 0.5 * hb) * humanAlpha;   // soft inner tint, not a white-out
+    heart.nucMat.opacity = (0.5 + 0.4 * hb) * humanAlpha;
+    heart.nucleus.scale.setScalar(0.08 + 0.022 * hb);
+    heart.lobe.scale.setScalar(0.052 + 0.014 * hb);
+    heart.halo.material.opacity = (0.2 + 0.24 * hb) * humanAlpha;
+    heart.halo.scale.setScalar(0.2 + 0.05 * hb);
+    heart.light.intensity = (0.22 + 0.5 * hb) * humanAlpha;
 
-    const sb = signalbeat(time);
-    core.glow.material.opacity = (0.18 + 0.28 * sb) * twinAlpha;
-    core.glow.scale.setScalar(0.17 + 0.06 * sb);
-    core.mesh.material.opacity = 0.98 * twinAlpha;
-    core.mesh.rotation.y = time * 1.4;
-    core.mesh.rotation.x = time * 0.7;
-    core.mesh.scale.setScalar(1 + 0.14 * sb);
-    core.gemMat.emissiveIntensity = 0.55 + 0.7 * sb;
-    core.edgeMat.opacity = (0.4 + 0.4 * sb) * twinAlpha;
-    core.light.intensity = (0.2 + 0.45 * sb) * twinAlpha;
+    core.nucMat.opacity = (0.5 + 0.4 * eb) * twinAlpha;
+    core.nucleus.scale.setScalar(0.08 + 0.022 * eb);
+    core.lobe.scale.setScalar(0.052 + 0.014 * eb);
+    core.halo.material.opacity = (0.18 + 0.24 * eb) * twinAlpha;
+    core.halo.scale.setScalar(0.19 + 0.05 * eb);
+    core.light.intensity = (0.2 + 0.45 * eb) * twinAlpha;
+
+    /* the visible pulse: a wave launches from each chest at its beat's lub
+       and expands through the body, fading as it travels */
+    {
+      const spH = smooth(splitPos);
+      const hx = -GAP * spH - moat * 0.20, tx = GAP * spH + moat * 0.20;
+      const CYCLE = 1.15, LUB = 0.10;
+      const drive = (mat, x, t, alpha) => {
+        const u = mat.userData.pulse;
+        if (!u) return;
+        const ph = (((t % CYCLE) + CYCLE) % CYCLE) / CYCLE;
+        const wp = clamp01((ph - LUB) / 0.88);
+        u.uHeartW.value.set(x + 0.03, 1.27, 0.02);
+        u.uWaveR.value = wp * 2.15;
+        u.uWaveAmp.value = ph < LUB ? 0 : Math.pow(1 - wp, 1.6) * 0.5 * alpha;
+      };
+      drive(matHuman, hx, time, humanAlpha);
+      drive(matTwin, tx, time - 0.22, twinAlpha);
+    }
 
     /* live instrument readouts */
     if (telBpm) telBpm.textContent = `${64 + Math.round(hb * 6)} BPM`;
@@ -2159,13 +2168,13 @@ function update(time) {
     /* heart surge — the source of authority swells, but restrained (the
        threads + comets carry the energy, not a bloom white-out) */
     if (heart) {
-      heart.glow.material.opacity = Math.min(1, heart.glow.material.opacity + 0.16 * authBeat);
-      heart.glow.scale.setScalar(heart.glow.scale.x + 0.10 * authBeat);
+      heart.halo.material.opacity = Math.min(1, heart.halo.material.opacity + 0.16 * authBeat);
+      heart.halo.scale.setScalar(heart.halo.scale.x + 0.10 * authBeat);
       heart.light.intensity += 0.95 * authBeat;
-      heart.mesh.scale.multiplyScalar(1 + 0.10 * authBeat);
+      heart.nucleus.scale.multiplyScalar(1 + 0.10 * authBeat);
     }
     if (core) {
-      core.glow.material.opacity = Math.min(1, core.glow.material.opacity + 0.13 * authBeat);
+      core.halo.material.opacity = Math.min(1, core.halo.material.opacity + 0.13 * authBeat);
       core.light.intensity += 0.7 * authBeat;
     }
 
@@ -2525,8 +2534,53 @@ function update(time) {
     }
   } else {
     quantumLight.intensity = 0;
-    vaultFx.style.opacity = '0';
     for (const s of sovWords) s.el.style.opacity = '0';
+
+    /* THE LINK — one pulse, two bodies: whenever both sovereigns stand
+       apart, a hairline thread carries each heartbeat from the human's
+       chest to the twin's; the travelling spark arrives exactly as the
+       twin's golden echo fires (~0.22s). During the vault act the threads
+       route through the monolith instead (drawn above). */
+    const linkVis = figureLoaded && smooth(splitPos) > 0.6 ? Math.min(1, (smooth(splitPos) - 0.6) / 0.3) : 0;
+    if (linkVis > 0.01) {
+      const Wp = innerWidth, Hp = innerHeight, DPR2 = Math.min(devicePixelRatio || 1, 2);
+      if (vaultFx.width !== Math.round(Wp * DPR2) || vaultFx.height !== Math.round(Hp * DPR2)) {
+        vaultFx.width = Math.round(Wp * DPR2); vaultFx.height = Math.round(Hp * DPR2);
+      }
+      const g2 = vaultFxCtx;
+      g2.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+      g2.clearRect(0, 0, Wp, Hp);
+      vaultFx.style.opacity = '1';
+      const spL = smooth(splitPos);
+      const hxw = -GAP * spL - moat * 0.20, txw = GAP * spL + moat * 0.20;
+      _proj.set(hxw + 0.03, 1.27, 0.02).project(camera);
+      const x1 = (_proj.x * 0.5 + 0.5) * Wp, y1 = (-_proj.y * 0.5 + 0.5) * Hp;
+      _proj.set(txw - 0.03, 1.27, 0.02).project(camera);
+      const x2 = (_proj.x * 0.5 + 0.5) * Wp, y2 = (-_proj.y * 0.5 + 0.5) * Hp;
+      const midX = (x1 + x2) / 2, midY = Math.min(y1, y2) - 18;
+      const hbL = heartbeat(time);
+      const base = (0.07 + 0.07 * hbL) * linkVis;
+      for (const [w, aMul] of [[2.2, 0.4], [0.8, 1]]) {
+        g2.strokeStyle = `rgba(255,170,90,${(base * aMul).toFixed(3)})`;
+        g2.lineWidth = w;
+        g2.beginPath(); g2.moveTo(x1, y1); g2.quadraticCurveTo(midX, midY, x2, y2); g2.stroke();
+      }
+      /* the spark: leaves the human at the lub, lands on the twin 0.22s
+         later — the very moment the golden echo fires */
+      const tIn = ((time % 1.15) + 1.15) % 1.15 - 0.115;          // seconds since the lub peak
+      if (tIn >= 0 && tIn <= 0.22) {
+        const uT = tIn / 0.22, uI = 1 - uT;
+        const px = uI * uI * x1 + 2 * uI * uT * midX + uT * uT * x2;
+        const py = uI * uI * y1 + 2 * uI * uT * midY + uT * uT * y2;
+        const gr2 = g2.createRadialGradient(px, py, 0, px, py, 5.5);
+        gr2.addColorStop(0, `rgba(255,190,110,${(0.65 * linkVis).toFixed(3)})`);
+        gr2.addColorStop(1, 'rgba(255,190,110,0)');
+        g2.fillStyle = gr2;
+        g2.beginPath(); g2.arc(px, py, 5.5, 0, Math.PI * 2); g2.fill();
+      }
+    } else {
+      vaultFx.style.opacity = '0';
+    }
   }
 
   /* the gateway galaxy is retired — its sprites/labels stay dormant */
