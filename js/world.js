@@ -834,7 +834,10 @@ loader.load('assets/models/human-hd.glb',
   () => loader.load('assets/models/hero.glb',
     (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
     undefined, (err) => console.warn('hero.glb:', err?.message || err)));
-loader.load('assets/models/twin-hd.glb',
+/* the twin is CAST FROM the human — the same sculpted body, mirrored,
+   struck in gold. (The separate twin mesh read female; a digital twin of
+   this human must read as HIM.) */
+loader.load('assets/models/human-hd.glb',
   (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
   undefined,
   () => loader.load('assets/models/twin.glb',
