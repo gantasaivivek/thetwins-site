@@ -712,7 +712,10 @@ let heart = null, core = null;    // the human heart / twin data core
    (flatShading alone is invisible here: the GLB is too dense, its per-triangle
    facets are sub-pixel.) */
 function chisel(mat, k = 3.0) {
+  /* chains with any existing onBeforeCompile (e.g. the pulse wave) */
+  const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh) => {
+    if (prev) prev(sh);
     sh.fragmentShader = sh.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       `#include <normal_fragment_maps>
@@ -782,18 +785,22 @@ matHuman.emissiveIntensity = 0.16;
 /* the DIGITAL TWIN: the same premium crystal, cast in gold — the sovereign's
    precious double. Platinum ice skin, molten gold burning in the depths; the
    colour of the inner light is what tells the twins apart: blood vs bullion. */
+/* the twin is CUT, not cast — where the human is smooth living glass, the
+   twin is faceted gold CRYSTAL: hard gem planes (world-space chisel),
+   sharp clearcoat, iridescent glints. The digital copy is a jewel of the
+   original. */
 const matTwin = iceMaterial();
-matTwin.transmission = 0.34;
-matTwin.roughness = 0.17;
-matTwin.ior = 1.4;
+matTwin.transmission = 0.52;
+matTwin.roughness = 0.1;
+matTwin.ior = 1.45;
 matTwin.thickness = 1.5;
 matTwin.attenuationColor = new THREE.Color(0xc9a35e);    // molten gold in the depths — saturated
-matTwin.attenuationDistance = 0.6;
-matTwin.envMapIntensity = 0.6;
-matTwin.specularIntensity = 0.6;
-matTwin.clearcoat = 0.6;
-matTwin.clearcoatRoughness = 0.32;
-matTwin.iridescence = 0.34;
+matTwin.attenuationDistance = 0.5;
+matTwin.envMapIntensity = 0.9;
+matTwin.specularIntensity = 1.0;
+matTwin.clearcoat = 0.9;
+matTwin.clearcoatRoughness = 0.15;
+matTwin.iridescence = 0.55;
 matTwin.color = new THREE.Color(0xc2b294);    // champagne gold — the twin's struck-coin cast
 matTwin.sheen = 0.6;
 matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
@@ -804,6 +811,8 @@ matTwin.emissiveIntensity = 0.3;
    heartbeat — its wave stays wired but silent, amp 0 in the drive) */
 pulseWave(matHuman, 0xff5a3a);
 pulseWave(matTwin, 0xffb44e);
+/* the CUT: gem facets on the twin only — chained after the pulse wave */
+chisel(matTwin, 3.0);
 
 function fitInto(gltf, group, mat, mirror) {
   const src = gltf.scene;
