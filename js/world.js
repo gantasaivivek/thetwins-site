@@ -830,7 +830,16 @@ function fitInto(gltf, group, mat, mirror) {
 
 const loader = new GLTFLoader();
 let loadedA = false, loadedB = false;
-const markLoaded = () => { if (loadedA && loadedB) figureLoaded = true; };
+const markLoaded = () => {
+  if (loadedA && loadedB) {
+    figureLoaded = true;
+    /* pre-link the figure programs NOW (the twin's chisel+pulse chain is a
+       distinct program from the human's) — otherwise the twin's shader
+       links on its first visible frame, which can paint black for a beat
+       under load (seen once after a scroll-restoring reload) */
+    try { renderer.compile(scene, camera); } catch (_) { /* never fatal */ }
+  }
+};
 /* the human is the hand-on-heart hero; the twin is the open-palm A-pose.
    Museum-grade meshes first; if either is missing, the original sculpts
    step back in (never a blank stage).
