@@ -38,6 +38,11 @@
   --ice-mist: #d1d6e3;
   --silver: #afb6c7;
   --periwinkle: #a7b2d6;
+  /* the sovereign metals — antique gold ink on the bright world; used ONLY
+     as hairlines, marks and interpuncts, never as fills */
+  --gold: #a5741f;
+  --gold-bright: #c9974a;
+  --gold-glow: rgba(201, 151, 74, 0.55);
   --sky-glow: #b5d5ff;
   --amber: #cda05e;
   --ink: #4c4f53;
@@ -174,7 +179,8 @@ a:focus-visible, button:focus-visible {
   inset: 0;
   transform-origin: left center;
   transform: scaleX(0);
-  background: var(--slate-dark);
+  /* the fill runs slate into gold — the seal igniting as the world wakes */
+  background: linear-gradient(90deg, var(--slate-dark) 55%, var(--gold-bright));
 }
 .loader-status { opacity: 0.65; min-height: 14px; }
 .loader-frost {
@@ -264,7 +270,7 @@ a:focus-visible, button:focus-visible {
   position: absolute;
   left: 0; bottom: -4px;
   width: 100%; height: 1px;
-  background: currentColor;
+  background: var(--gold-bright);
   transform: scaleX(0);
   transform-origin: right;
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
@@ -349,15 +355,22 @@ a:focus-visible, button:focus-visible {
 .hero-line {
   position: absolute;
   left: 0; right: 0;
-  bottom: 120px;
+  bottom: 118px;
   margin: 0 auto;
-  width: min(90vw, 720px);
+  width: min(92vw, 760px);
   text-align: center;
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  opacity: 0.68;
+  opacity: 0.8;
   text-shadow: 0 1px 14px rgba(238, 243, 250, 0.9), 0 0 5px rgba(238, 243, 250, 0.6);
+}
+/* gold interpuncts carry the vow's beat wherever the line appears */
+.gsep {
+  font-style: normal;
+  color: var(--gold-bright);
+  padding: 0 0.35em;
 }
 
 .scroll-cue {
@@ -394,20 +407,32 @@ a:focus-visible, button:focus-visible {
   z-index: 36;
   top: 0;
   left: 0;
-  width: min(300px, 82vw);
+  width: min(320px, 84vw);
+  padding: 18px 20px 15px;
   color: #2b3038;
+  /* frosted instrument panel — a KEPT object, like the vault's platinum:
+     glass, a gold hairline at the crown, and a quiet shadow for seating */
+  background: linear-gradient(168deg, rgba(246, 249, 253, 0.6), rgba(233, 238, 246, 0.34));
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-top: 1px solid var(--gold-glow);
+  border-radius: 2px;
+  box-shadow: 0 18px 44px rgba(35, 38, 44, 0.10), 0 2px 8px rgba(35, 38, 44, 0.05);
   opacity: 0;
   visibility: hidden;
   will-change: transform, opacity;
   pointer-events: none;
 }
-.anno-index { color: #5b6675; opacity: 1; margin-bottom: 10px; }
+.anno-index { color: var(--gold); opacity: 1; margin-bottom: 10px; }
 .anno h2 {
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  line-height: 1.4;
-  margin-bottom: 8px;
+  /* the display voice — the same engraved capitals as THE TWINS itself */
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 17px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  line-height: 1.35;
+  margin-bottom: 9px;
   text-transform: uppercase;
   color: #23272e;
 }
@@ -443,8 +468,19 @@ a:focus-visible, button:focus-visible {
 .anno-meta {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(43, 48, 56, 0.28);
+  border-top: 1px solid rgba(43, 48, 56, 0.22);
+  position: relative;
   opacity: 0.6;
+}
+/* a short gold tick opens the meta rule — the engraver's mark */
+.anno-meta::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 26px;
+  height: 1px;
+  background: var(--gold-bright);
 }
 
 /* explore-block telemetry labels live over the bright arctic fog.
@@ -691,9 +727,10 @@ a:focus-visible, button:focus-visible {
   visibility: hidden;
 }
 .vt {
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(18px, 2.7vw, 38px);
-  font-weight: 500;
-  letter-spacing: 0.24em;
+  font-weight: 640;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--slate-dark);
   /* a stronger ice halo — the line reads over snow AND over thin legs */
@@ -730,9 +767,10 @@ a:focus-visible, button:focus-visible {
   left: 0;
   top: 0;
   z-index: 33;                          /* over the finale film, under the HUD */
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(12px, 1.45vw, 19px);
-  font-weight: 500;
-  letter-spacing: 0.26em;
+  font-weight: 620;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--slate-dark);
   text-shadow: 0 1px 18px rgba(238, 243, 250, 0.95), 0 0 8px rgba(238, 243, 250, 0.8);
@@ -850,7 +888,7 @@ a:focus-visible, button:focus-visible {
   transition: opacity 0.5s ease;
 }
 .spec:hover::after { opacity: 1; }
-.spec:hover .spec-num { text-shadow: 0 0 24px rgba(181, 213, 255, 0.65); }
+.spec:hover .spec-num { text-shadow: 0 0 24px var(--gold-glow); }
 .spec-num {
   position: relative;
   z-index: 1;
@@ -864,7 +902,8 @@ a:focus-visible, button:focus-visible {
 .spec-num em {
   font-style: normal;
   font-size: 0.35em;
-  opacity: 0.6;
+  color: var(--gold);
+  opacity: 0.9;
   margin-left: 4px;
 }
 .spec-label { position: relative; z-index: 1; margin-top: 14px; opacity: 0.68; }
@@ -914,8 +953,12 @@ a:focus-visible, button:focus-visible {
 #manifesto.lit .manifesto-text .accent { background-size: 100% 1px; }
 .manifesto-sig {
   margin-top: 52px;
-  color: #64748f;
-  opacity: 0.85;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: clamp(14px, 1.8vw, 19px);
+  font-weight: 620;
+  letter-spacing: 0.18em;
+  color: #4c5568;
+  opacity: 0.92;
 }
 
 /* ============================================================
@@ -1025,9 +1068,10 @@ a:focus-visible, button:focus-visible {
 }
 /* the vow — the finalized tagline closes the page at full voice */
 .footer-vow {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 13px;
+  font-weight: 640;
+  letter-spacing: 0.2em;
   color: var(--slate-dark);
   opacity: 1;
   margin-bottom: 6px;

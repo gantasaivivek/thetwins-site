@@ -725,10 +725,13 @@ function chisel(mat, k = 3.0) {
   };
 }
 
+/* the figures are museum-grade sculpted meshes now — smooth flowing glass,
+   not faceted crystal. chisel() is retired for the bodies (the hard normal
+   quantization read as low-poly); the premium is in polish: clearcoat,
+   sheen, and the inner light. */
 const matHuman = iceMaterial();
-chisel(matHuman);
 matHuman.transmission = 0.34;          // translucent, but with enough body to hold colour + form
-matHuman.roughness = 0.24;
+matHuman.roughness = 0.18;
 matHuman.ior = 1.4;
 matHuman.thickness = 1.5;
 matHuman.attenuationColor = new THREE.Color(0xcf7f78);   // warm blood in the depths — richer, redder
@@ -748,9 +751,8 @@ matHuman.emissiveIntensity = 0.16;
    precious double. Platinum ice skin, molten gold burning in the depths; the
    colour of the inner light is what tells the twins apart: blood vs bullion. */
 const matTwin = iceMaterial();
-chisel(matTwin);
 matTwin.transmission = 0.34;
-matTwin.roughness = 0.22;
+matTwin.roughness = 0.17;
 matTwin.ior = 1.4;
 matTwin.thickness = 1.5;
 matTwin.attenuationColor = new THREE.Color(0xc9a35e);    // molten gold in the depths — saturated
@@ -783,11 +785,21 @@ function fitInto(gltf, group, mat, mirror) {
 const loader = new GLTFLoader();
 let loadedA = false, loadedB = false;
 const markLoaded = () => { if (loadedA && loadedB) figureLoaded = true; };
-/* the human is the hand-on-heart hero; the twin is the neutral A-pose */
-loader.load('assets/models/hero.glb', (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
-  undefined, (err) => console.warn('hero.glb:', err?.message || err));
-loader.load('assets/models/twin.glb', (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
-  undefined, (err) => console.warn('twin.glb:', err?.message || err));
+/* the human is the hand-on-heart hero; the twin is the open-palm A-pose.
+   Museum-grade meshes first; if either is missing, the original sculpts
+   step back in (never a blank stage). */
+loader.load('assets/models/human-hd.glb',
+  (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+  undefined,
+  () => loader.load('assets/models/hero.glb',
+    (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+    undefined, (err) => console.warn('hero.glb:', err?.message || err)));
+loader.load('assets/models/twin-hd.glb',
+  (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
+  undefined,
+  () => loader.load('assets/models/twin.glb',
+    (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
+    undefined, (err) => console.warn('twin.glb:', err?.message || err)));
 
 {
   /* the human's HEART — a faceted ruby crystal (same cut language as the vault
@@ -1231,8 +1243,48 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     iceMat, edgeMat, fracMat, fracMatB, hMesh, hGlow, gemMat, gemEdgeMat,
     coreEdgeMat, shaftMats, orbit, orbitMat, orbitData, orbitDummy: new THREE.Object3D(),
     bandMat, goldLineMat, sealMat, moteMat, motePos, moteSeed, moteGeo,
-    veinsReady: false
+    veinsReady: false, hdMats: null
   };
+
+  /* THE MUSEUM VAULT — the Higgsfield-sculpted monolith (baked kintsugi
+     texture) replaces the procedural block when it arrives. Its own texture
+     doubles as the emissive map, so the real painted veins carry the pulse.
+     On any failure the procedural block simply remains — never an empty
+     pedestal. */
+  new GLTFLoader().load('assets/models/vault-hd.glb', (g) => {
+    const src = g.scene;
+    const box = new THREE.Box3().setFromObject(src);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    const s = 2.75 / (size.y || 1);                     // monument height
+    const hdMats = [];
+    src.traverse((o) => {
+      if (!o.isMesh) return;
+      const baked = o.material && o.material.map ? o.material.map : null;
+      if (baked) baked.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.MeshPhysicalMaterial({
+        map: baked, color: 0xffffff,
+        emissiveMap: baked, emissive: new THREE.Color(0xffb54a), emissiveIntensity: 0,
+        metalness: 0.35, roughness: 0.22,
+        clearcoat: 1.0, clearcoatRoughness: 0.1,
+        envMapIntensity: 1.4, transparent: true, opacity: 0
+      });
+      o.material = m;
+      hdMats.push(m);
+    });
+    src.scale.setScalar(s);
+    src.position.set(-center.x * s, -box.min.y * s - 0.12, -center.z * s);  // base bites the ice
+    src.rotation.y = 0.26;                              // quarter-turn — the leaning edge faces camera
+    vault.add(src);
+    /* retire the procedural shell — the sculpture owns the plinth now.
+       The heart GEM retires with it (painted-through-depth reads as a
+       sticker on the opaque sculpture); its soft radiance stays, and the
+       ruby itself becomes the finale film's exclusive reveal. */
+    block.visible = edges.visible = core2.visible = false;
+    fracA.visible = fracB.visible = false;
+    hMesh.visible = false;
+    vault.userData.hdMats = hdMats;
+  }, undefined, () => { /* keep the procedural monolith */ });
 }
 scene.add(vault);
 
@@ -2299,6 +2351,12 @@ function update(time) {
     /* the kintsugi breathes: gold seams + vein-map surge with every beat */
     ud.edgeMat.opacity = (0.30 + 0.22 * hb) * moatVis;
     if (ud.veinsReady) ud.iceMat.emissiveIntensity = (0.55 + 0.8 * hb) * moatVis;
+    /* the museum sculpture (once arrived) breathes through its own painted
+       veins — the baked kintsugi doubles as the emissive map */
+    if (ud.hdMats) for (const m of ud.hdMats) {
+      m.opacity = Math.min(1, moatVis * 1.35);
+      m.emissiveIntensity = (0.7 + 1.0 * hb) * moatVis;
+    }
     ud.fracMat.opacity = 0.15 * moatVis;                          // internal cleavage, barely there
     ud.fracMatB.opacity = 0.11 * moatVis;
     /* the kept-object hardware: platinum band + gold hairline + seal ring */
@@ -2365,21 +2423,26 @@ function update(time) {
       ud.orbitMat.opacity = 0.8 * moatVis * heartUp;
     }
 
-    /* the shards ACCRETE — each scales in on its own cue as the vault grows,
-       so the ice visibly crystallises over the block instead of fading in */
-    const acc = grow * 1.18;
-    const { inst, mat, data, dummy } = vaultCrystals;
-    for (let i = 0; i < data.length; i++) {
-      const d = data[i];
-      const sc = clamp01((acc - d.order) / 0.18) * d.s;
-      dummy.position.set(d.x, d.y, d.z);
-      dummy.rotation.set(d.qx, d.qy, 0);
-      dummy.scale.setScalar(Math.max(sc, 1e-4));
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
+    /* the gold ACCRETES — each nugget scales in on its own cue as the vault
+       grows. Seeded on the procedural surface, so it retires with it when
+       the museum sculpture (a different silhouette) takes the plinth. */
+    if (!ud.hdMats) {
+      const acc = grow * 1.18;
+      const { inst, mat, data, dummy } = vaultCrystals;
+      for (let i = 0; i < data.length; i++) {
+        const d = data[i];
+        const sc = clamp01((acc - d.order) / 0.18) * d.s;
+        dummy.position.set(d.x, d.y, d.z);
+        dummy.rotation.set(d.qx, d.qy, 0);
+        dummy.scale.setScalar(Math.max(sc, 1e-4));
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      mat.opacity = 0.85 * moatVis;
+    } else {
+      vaultCrystals.mat.opacity = 0;
     }
-    inst.instanceMatrix.needsUpdate = true;
-    mat.opacity = 0.85 * moatVis;
 
     /* the vow lands in the world — each phrase at the feet of its subject,
        blurring in as the vault grows, clearing before the finale title card */
