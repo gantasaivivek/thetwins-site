@@ -800,7 +800,8 @@ matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming 
 matTwin.emissive = new THREE.Color(0x33260a);
 matTwin.emissiveIntensity = 0.3;
 
-/* the human's blood-warm pulse; the twin's golden echo of the same beat */
+/* the twin's golden receive-wave (the human keeps only the chest-top
+   heartbeat — its wave stays wired but silent, amp 0 in the drive) */
 pulseWave(matHuman, 0xff5a3a);
 pulseWave(matTwin, 0xffb44e);
 
@@ -2101,7 +2102,11 @@ function update(time) {
         u.uWaveR.value = wp * 2.15;
         u.uWaveAmp.value = ph < LUB ? 0 : Math.pow(1 - wp, 1.6) * 0.5 * alpha;
       };
-      drive(matHuman, hx, time, humanAlpha);
+      /* the human keeps only the chest-top heartbeat — no body-wide wave
+         (user direction). The shader stays wired (amp 0) so this remains a
+         one-line flip. The twin still visibly RECEIVES the pulse as gold. */
+      const uH = matHuman.userData.pulse;
+      if (uH) uH.uWaveAmp.value = 0;
       drive(matTwin, tx, time - 0.22, twinAlpha);
     }
 
