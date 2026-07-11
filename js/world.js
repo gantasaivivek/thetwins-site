@@ -734,7 +734,7 @@ matHuman.transmission = 0.34;          // translucent, but with enough body to h
 matHuman.roughness = 0.18;
 matHuman.ior = 1.4;
 matHuman.thickness = 1.5;
-matHuman.attenuationColor = new THREE.Color(0x8fb0c8);   // cool signal-silver in the depths (worn by the TWIN now)
+matHuman.attenuationColor = new THREE.Color(0xcf7f78);   // warm blood in the depths — the living human
 matHuman.attenuationDistance = 0.6;                      // short light-path → saturated inner colour, not milk
 matHuman.envMapIntensity = 0.5;        // THE milk fix: stop the blown sky washing every surface white
 matHuman.specularIntensity = 0.5;
@@ -743,8 +743,8 @@ matHuman.clearcoatRoughness = 0.4;     // soften the hot clearcoat speculars
 matHuman.iridescence = 0.3;
 matHuman.color = new THREE.Color(0x9db1c6);   // deeper cool ice so the silhouette reads against the snow
 matHuman.sheen = 0.5;
-matHuman.sheenColor = new THREE.Color(0xd5e4f0);
-matHuman.emissive = new THREE.Color(0x16222e);  // a cool inner cast — the machine side runs cold
+matHuman.sheenColor = new THREE.Color(0xffd2bd);
+matHuman.emissive = new THREE.Color(0x3a1f24);  // the inner warmth stays — glow retained
 matHuman.emissiveIntensity = 0.16;
 
 /* the DIGITAL TWIN: the same premium crystal, cast in gold — the sovereign's
@@ -762,7 +762,7 @@ matTwin.specularIntensity = 0.6;
 matTwin.clearcoat = 0.6;
 matTwin.clearcoatRoughness = 0.32;
 matTwin.iridescence = 0.34;
-matTwin.color = new THREE.Color(0xc2b294);    // champagne gold — worn by the LIVING human now
+matTwin.color = new THREE.Color(0xc2b294);    // champagne gold — the twin's struck-coin cast
 matTwin.sheen = 0.6;
 matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
 matTwin.emissive = new THREE.Color(0x33260a);
@@ -788,21 +788,20 @@ const markLoaded = () => { if (loadedA && loadedB) figureLoaded = true; };
 /* the human is the hand-on-heart hero; the twin is the open-palm A-pose.
    Museum-grade meshes first; if either is missing, the original sculpts
    step back in (never a blank stage).
-   COLOURS SWAPPED per direction: the LIVING human wears the warm gold
-   (life, blood-heat, the sun side); the DIGITAL twin wears the cool
-   platinum ice (the struck coin, the machine side). The red heart stays
-   with the human, the gold signal core with the twin. */
+   The HUMAN wears the cool ice with warm blood-light in the depths; the
+   DIGITAL twin wears the champagne gold (the struck coin). The red heart
+   stays with the human, the gold signal core with the twin. */
 loader.load('assets/models/human-hd.glb',
-  (g) => { fitInto(g, figA, matTwin, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+  (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
   undefined,
   () => loader.load('assets/models/hero.glb',
-    (g) => { fitInto(g, figA, matTwin, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+    (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
     undefined, (err) => console.warn('hero.glb:', err?.message || err)));
 loader.load('assets/models/twin-hd.glb',
-  (g) => { fitInto(g, figB, matHuman, true); loadedB = true; markLoaded(); },
+  (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
   undefined,
   () => loader.load('assets/models/twin.glb',
-    (g) => { fitInto(g, figB, matHuman, true); loadedB = true; markLoaded(); },
+    (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
     undefined, (err) => console.warn('twin.glb:', err?.message || err)));
 
 {
@@ -2113,14 +2112,12 @@ function update(time) {
     figA.visible = humanAlpha > 0.01;
     figA.position.set(humanX, Math.sin(time * 0.5) * 0.01, 0);
     figA.rotation.y = sway + (1 - sp) * Math.sin(time * 0.12) * 0.12;
-    /* colours are swapped at dressing time (human wears matTwin's gold,
-       twin wears matHuman's ice) — the alpha drives swap with them */
-    matTwin.opacity = humanAlpha;
+    matHuman.opacity = humanAlpha;
 
     figB.visible = sp > 0.002 && twinAlpha > 0.01;
     figB.position.set(twinX, Math.sin(time * 0.5 + 1) * 0.01, 0);
     figB.rotation.y = -sway;
-    if (matHuman) { matHuman.opacity = twinAlpha; }
+    if (matTwin) { matTwin.opacity = twinAlpha; }
 
     shadowA.position.set(humanX, 0.01, 0);
     shadowB.position.set(twinX, 0.01, 0);
