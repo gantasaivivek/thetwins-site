@@ -757,4 +757,63 @@
       target.focus({ preventScroll: true });
     });
   });
+
+  /* ---------- CLAIM YOUR VAULT — seal your name into the platinum ----------
+     The signature moment: the visitor's name is struck letter by letter into
+     the plinth ring (world.js VAULT.engrave), the OWNER telemetry takes their
+     name, and the finale vow addresses them. Persisted — a returning visitor
+     finds their vault still theirs. */
+  {
+    const cta = $('#claim-cta'), modal = $('#claim-modal'),
+          nameIn = $('#claim-name'), sealBtn = $('#claim-seal'),
+          closeBtn = $('#claim-x'), ownerDd = $('#owner-dd'),
+          vtOwner = $('#vt-owner'), vwName = $('#vw-owner-name');
+    const applyOwner = (name) => {
+      window.__vaultOwned = true;
+      if (ownerDd) ownerDd.textContent = `${name} — SOLE KEY`;
+      if (vtOwner && vwName) { vwName.textContent = name + '.'; vtOwner.hidden = false; }
+    };
+    const stored = (() => {
+      try { return localStorage.getItem('twinsVaultOwner'); } catch { return null; }
+    })();
+    if (stored) {
+      applyOwner(stored);
+      /* the world may still be booting — engrave as soon as the API exists */
+      const arm = () => window.VAULT ? window.VAULT.engrave(stored, true) : setTimeout(arm, 250);
+      arm();
+    }
+    const open = () => {
+      if (!modal) return;
+      modal.hidden = false;
+      try { stopAuto(); } catch (_) { /* autoplay not armed yet */ }
+      setTimeout(() => nameIn && nameIn.focus(), 60);
+    };
+    const close = () => { if (modal) modal.hidden = true; };
+    cta && cta.addEventListener('click', open);
+    closeBtn && closeBtn.addEventListener('click', close);
+    modal && modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', (e) => {
+      if (modal && !modal.hidden && e.key === 'Escape') close();
+    });
+    /* typing must never scroll the film or trip the autoplay key handler */
+    nameIn && nameIn.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') sealBtn && sealBtn.click();
+    });
+    sealBtn && sealBtn.addEventListener('click', () => {
+      const name = (nameIn.value || '')
+        .toUpperCase().replace(/[^A-Z0-9 '.\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+      if (!name) {
+        nameIn.classList.add('shake');
+        setTimeout(() => nameIn.classList.remove('shake'), 450);
+        nameIn.focus();
+        return;
+      }
+      try { localStorage.setItem('twinsVaultOwner', name); } catch (_) { /* private mode */ }
+      applyOwner(name);
+      close();
+      window.VAULT && window.VAULT.engrave(name);
+      window.SFX && window.SFX.telemetry && window.SFX.telemetry(9);
+    });
+  }
 })();

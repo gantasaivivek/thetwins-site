@@ -149,7 +149,7 @@
         <div class="anno-index">////// PROTOCOL_04</div>
         <h2>THE CENTENNIAL VAULT</h2>
         <dl class="anno-tel">
-          <div><dt>OWNER</dt><dd>YOU — SOLE KEY</dd></div>
+          <div><dt>OWNER</dt><dd id="owner-dd">YOU — SOLE KEY</dd></div>
           <div><dt>CIPHER</dt><dd>QUANTUM-HYBRID</dd></div>
           <div><dt>SEALED</dt><dd data-tel="yr">— YR</dd></div>
         </dl>
@@ -279,6 +279,23 @@
     <span class="vt"><i class="vw" data-t="0.07">ONE</i> <i class="vw" data-t="0.15">HUMAN.</i></span>
     <span class="vt"><i class="vw" data-t="0.32">ONE</i> <i class="vw" data-t="0.40">TWIN.</i></span>
     <span class="vt vt-close"><i class="vw" data-t="0.58">EVERY</i> <i class="vw" data-t="0.67">AGENT</i> <i class="vw" data-t="0.77">ACCOUNTABLE.</i></span>
+    <!-- lands last, only once the visitor has sealed their name -->
+    <span class="vt vt-owner" id="vt-owner" hidden><i class="vw" data-t="0.92">SEALED</i> <i class="vw" data-t="0.98">FOR</i> <i class="vw vw-gold" data-t="1.06" id="vw-owner-name">—</i></span>
+  </div>
+
+  <!-- CLAIM YOUR VAULT — the signature moment: a name, struck into platinum -->
+  <button id="claim-cta" class="claim-cta" type="button">
+    <span class="claim-dot" aria-hidden="true">◈</span> SEAL YOUR NAME INTO THE VAULT
+  </button>
+  <div id="claim-modal" role="dialog" aria-modal="true" aria-labelledby="claim-title" hidden>
+    <div class="claim-panel">
+      <button class="claim-x" id="claim-x" type="button" aria-label="Close">×</button>
+      <div class="claim-eyebrow">////// THE CENTENNIAL VAULT</div>
+      <h3 id="claim-title">Seal your name into the vault</h3>
+      <p class="claim-sub">Struck into the platinum ring, letter by letter. Yours for a hundred years.</p>
+      <input id="claim-name" type="text" maxlength="18" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="YOUR NAME" aria-label="Your name">
+      <button id="claim-seal" class="claim-seal" type="button">SEAL IT</button>
+    </div>
   </div>
   <button id="sound-toggle" class="hud-sound" type="button" aria-pressed="false">SOUND: OFF</button>
   <button id="auto-toggle" class="hud-sound hud-auto" type="button" aria-pressed="false">AUTOPLAY: OFF</button>

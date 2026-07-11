@@ -1148,14 +1148,21 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
      detail: the vault belongs to SOMEONE, and their vow is struck in metal. */
   const sealCanvas = document.createElement('canvas');
   sealCanvas.width = 2048; sealCanvas.height = 128;
+  const sealTex = new THREE.CanvasTexture(sealCanvas);
+  sealTex.colorSpace = THREE.SRGBColorSpace;
+  sealTex.anisotropy = 8;
+  sealTex.wrapS = THREE.RepeatWrapping;
+  /* the brushed-platinum strip is pre-rendered once; the vow layer redraws
+     over it live — it re-renders letter by letter when the visitor SEALS
+     THEIR OWN NAME into the ring */
+  const sealBg = document.createElement('canvas');
+  sealBg.width = 2048; sealBg.height = 128;
   {
-    const g = sealCanvas.getContext('2d');
-    /* brushed platinum strip */
+    const g = sealBg.getContext('2d');
     const grad = g.createLinearGradient(0, 0, 0, 128);
     grad.addColorStop(0, '#c6ccd6'); grad.addColorStop(0.45, '#e2e6ec');
     grad.addColorStop(0.75, '#aab0bb'); grad.addColorStop(1, '#8f95a1');
     g.fillStyle = grad; g.fillRect(0, 0, 2048, 128);
-    /* horizontal brushing */
     g.globalAlpha = 0.14;
     for (let y = 2; y < 126; y += 2.5) {
       g.strokeStyle = (y % 5 < 2.5) ? '#7e8590' : '#f2f4f8';
@@ -1163,32 +1170,46 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
       g.beginPath(); g.moveTo(0, y); g.lineTo(2048, y); g.stroke();
     }
     g.globalAlpha = 1;
-    /* gold rims top + bottom */
     g.fillStyle = '#c9974a';
     g.fillRect(0, 0, 2048, 5); g.fillRect(0, 123, 2048, 5);
-    /* the engraved vow — exactly ONE vow scaled to span the strip, so it
-       wraps the ring seamlessly with no clipped or doubled characters */
-    const VOW = 'ONE HUMAN · ONE TWIN · EVERY AGENT ACCOUNTABLE · SEALED 2026—2126 · ';
+  }
+  const vowFor = (name) => name
+    ? `SEALED FOR ${name} · ONE HUMAN · ONE TWIN · EVERY AGENT ACCOUNTABLE · 2026—2126 · `
+    : 'ONE HUMAN · ONE TWIN · EVERY AGENT ACCOUNTABLE · SEALED 2026—2126 · ';
+  /* one vow, scaled to span the strip exactly (seamless wrap, no clipped or
+     doubled characters). struck/hot drive the live engraving: chars < struck
+     are cut; the char at hot glows gold-bright as the punch lands. */
+  const drawSealStrip = (text, struck = Infinity, hot = -1) => {
+    const g = sealCanvas.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, 2048, 128);
+    g.drawImage(sealBg, 0, 0);
     g.font = '600 42px "IBM Plex Mono", monospace';
     g.textBaseline = 'middle';
-    const vowW = g.measureText(VOW).width;
+    const vowW = g.measureText(text).width;
     g.save();
     g.scale(2048 / vowW, 1);
     let x = 0;
-    for (const ch of VOW) {
-      /* engraved: dark cut + light lower bevel; interpuncts struck in gold */
-      g.fillStyle = 'rgba(250,252,255,0.55)';
-      g.fillText(ch, x, 66 + 2);
-      g.fillStyle = ch === '·' ? '#a5741f' : '#4d525c';
-      g.fillText(ch, x, 66);
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (i < struck) {
+        /* engraved: dark cut + light lower bevel; interpuncts struck in gold */
+        g.fillStyle = 'rgba(250,252,255,0.55)';
+        g.fillText(ch, x, 68);
+        g.fillStyle = ch === '·' ? '#a5741f' : '#4d525c';
+        g.fillText(ch, x, 66);
+      } else if (i === hot) {
+        g.shadowColor = '#ffc36b'; g.shadowBlur = 16;
+        g.fillStyle = '#e8b45a';
+        g.fillText(ch, x, 66);
+        g.shadowBlur = 0;
+      }
       x += g.measureText(ch).width;
     }
     g.restore();
-  }
-  const sealTex = new THREE.CanvasTexture(sealCanvas);
-  sealTex.colorSpace = THREE.SRGBColorSpace;
-  sealTex.anisotropy = 8;
-  sealTex.wrapS = THREE.RepeatWrapping;
+    sealTex.needsUpdate = true;
+  };
+  drawSealStrip(vowFor(null));
   const sealMat = new THREE.MeshPhysicalMaterial({
     map: sealTex, metalness: 0.9, roughness: 0.34,
     envMapIntensity: 1.1, transparent: true, opacity: 0
@@ -1241,7 +1262,26 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     iceMat, edgeMat, fracMat, fracMatB, hMesh, hGlow, gemMat, gemEdgeMat,
     coreEdgeMat, shaftMats, orbit, orbitMat, orbitData, orbitDummy: new THREE.Object3D(),
     bandMat, goldLineMat, sealMat, moteMat, motePos, moteSeed, moteGeo,
-    veinsReady: false, hdMats: null
+    veinsReady: false, hdMats: null, engraveSurge: 0
+  };
+
+  /* CLAIM YOUR VAULT — the live engraving API. main.js owns the input UX;
+     this strikes the letters into the platinum one by one, each glowing
+     gold-hot as the punch lands, the inlay ring surging under it. The
+     signature moment: the vault belongs to someone, BY NAME. */
+  window.VAULT = {
+    engrave(name, instant) {
+      const text = vowFor(name);
+      if (instant || REDUCED) { drawSealStrip(text); return; }
+      const t0 = performance.now(), PER = 42;          // ms per letter-strike
+      const tick = () => {
+        const k = Math.min(text.length, Math.floor((performance.now() - t0) / PER));
+        drawSealStrip(text, k, k < text.length ? k : -1);
+        vault.userData.engraveSurge = 1;
+        if (k < text.length) requestAnimationFrame(tick);
+      };
+      tick();
+    }
   };
 
   /* THE MUSEUM VAULT — the Higgsfield-sculpted monolith (baked kintsugi
@@ -1312,6 +1352,9 @@ const sovWords = [
   document.body.appendChild(el);
   return { el, at: d.at };
 });
+
+/* the CLAIM invitation — surfaces while the vault stands, until it's owned */
+const claimCta = document.getElementById('claim-cta');
 
 /* GOLD ACCRETION — the igloo.inc growth signature, recast: molten-gold
    nuggets accrete in veins over the black mass as the vault forms — the
@@ -2379,7 +2422,9 @@ function update(time) {
     /* the kept-object hardware: platinum band + gold hairline + seal ring */
     ud.bandMat.opacity = moatVis;
     ud.goldLineMat.opacity = moatVis;
-    ud.goldLineMat.emissiveIntensity = 0.3 + 0.5 * hb;            // the hairline carries the pulse
+    /* the hairline carries the pulse — and blazes while a name is struck */
+    ud.engraveSurge *= 0.988;
+    ud.goldLineMat.emissiveIntensity = 0.3 + 0.5 * hb + 1.1 * ud.engraveSurge;
     ud.sealMat.opacity = moatVis;
     /* gold dust rising around the monument — reborn at the base */
     {
@@ -2492,6 +2537,13 @@ function update(time) {
       }
     }
 
+    /* the claim invitation rides the same window as the standing phrases,
+       and retires forever once the vault is owned */
+    if (claimCta) {
+      claimCta.classList.toggle('on',
+        moatVis > 0.55 && p < 0.93 && !window.__vaultOwned);
+    }
+
     /* LIGHT-THREADS — the two sovereigns feed the sealed heart: a warm
        blood-thread from the human's chest, a gold signal-thread from the
        twin's, each with a slow pulse of light travelling inward. The vault
@@ -2540,6 +2592,7 @@ function update(time) {
   } else {
     quantumLight.intensity = 0;
     for (const s of sovWords) s.el.style.opacity = '0';
+    if (claimCta) claimCta.classList.remove('on');
 
     /* THE LINK — one pulse, two bodies: whenever both sovereigns stand
        apart, a hairline thread carries each heartbeat from the human's
