@@ -961,22 +961,17 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   /* subdivision 2 (320 facets) with TWO octaves of displacement — a large
      calved form carrying a fine vocabulary of chips and cleaves. Keyed to the
      unit-sphere position so shared corners stay welded (watertight). */
-  monoGeo = new THREE.IcosahedronGeometry(1, 2).toNonIndexed();
+  monoGeo = new THREE.BoxGeometry(1.24, 1.16, 1.1).toNonIndexed();
   {
     const pos = monoGeo.attributes.position;
     const v = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      const kx = +v.x.toFixed(4), ky = +v.y.toFixed(4), kz = +v.z.toFixed(4);
-      const r = 1 + (h3(kx, ky, kz) - 0.5) * 0.40                      // the great form
-              + (h3(kx * 3.1, ky * 3.1, kz * 3.1) - 0.5) * 0.13;       // the chips
-      v.multiplyScalar(r);
-      /* calved-shard proportions: tall, narrow, slightly deeper than wide,
-         TAPERING toward a point above the shoulder — a shard, not a pillar
-         (the taper also keeps the summit clear of the annotation card) */
-      const yn = clamp01((v.y + 1) / 2);                               // 0 base .. 1 tip
-      const taper = 1 - 0.55 * Math.pow(Math.max(0, yn - 0.42) / 0.58, 1.35);
-      pos.setXYZ(i, v.x * 0.44 * taper, v.y * 1.42, v.z * 0.38 * taper);
+      /* a whisper of per-corner hash so the six faces never mirror the sky
+         as one dead-flat slab — a hewn block of glacier ice, not a glass die.
+         A CUBE now (matching the finale film), not the calved shard. */
+      const j = 1 + (h3(+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)) - 0.5) * 0.05;
+      pos.setXYZ(i, v.x * j, v.y * j, v.z * j);
     }
     monoGeo.computeVertexNormals();   // flat facets — the chisel is in the geometry
     /* per-FACET tonal jitter (all three verts of a face share one value):
@@ -992,45 +987,44 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     }
     monoGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   }
-  /* VOID-BLACK crystal — a black object lives on its reflections, so the
-     bright arctic range mirrors in every facet as PLATINUM light-play while
-     the mass itself stays night-deep. Faint transmission keeps a glassy
-     depth (never matte stone); the gold-vein emissive map is the kintsugi —
-     it loads async and then breathes with the owner's heartbeat. */
+  /* FROSTED GLACIAL ICE — clear crystal, not black stone. High transmission so
+     the internal frost and the amber heart read THROUGH the mass; a frost macro
+     drives the ROUGHNESS map so dendrite areas go matte-white while the clear
+     channels stay glassy — frost baked into the ice, so the cube has presence
+     against the bright snow instead of vanishing into it. */
+  const frostTex = texLoader.load('assets/env/vault-frost.jpg',
+    () => { if (vault.userData) vault.userData.veinsReady = true; },
+    undefined,
+    () => texLoader.load('assets/env/frost.jpg', (t) => {
+      frostTex.image = t.image; frostTex.needsUpdate = true;
+      if (vault.userData) vault.userData.veinsReady = true;
+    }));
+  frostTex.colorSpace = THREE.SRGBColorSpace;
+  frostTex.wrapS = frostTex.wrapT = THREE.RepeatWrapping;
+  frostTex.repeat.set(1.5, 1.5);                        // finer dendrite lace across the faces
   const iceMat = new THREE.MeshPhysicalMaterial({
-    color: 0x15171d, metalness: 0.3, roughness: 0.15,
+    color: 0xeef4fb, metalness: 0.0, roughness: 0.44,
     vertexColors: true,
-    transmission: 0.12, thickness: 1.2, ior: 1.45,
-    attenuationColor: new THREE.Color(0x0d0a06), attenuationDistance: 0.6,
-    clearcoat: 1.0, clearcoatRoughness: 0.08,
-    sheen: 0.5, sheenColor: new THREE.Color(0xffe2b0), sheenRoughness: 0.4,
-    iridescence: 0.25, iridescenceIOR: 1.32,
-    specularIntensity: 1.2, envMapIntensity: 1.5,
-    emissive: new THREE.Color(0xffb54a), emissiveIntensity: 0,
+    roughnessMap: frostTex,                             // frost dendrites go matte; clear channels stay see-through
+    transmission: 0.85, thickness: 0.75, ior: 1.31,     // translucent frosted crystal — the gem reads inside
+    attenuationColor: new THREE.Color(0xf3ead9), attenuationDistance: 1.3,  // the amber core warms the depths
+    clearcoat: 1.0, clearcoatRoughness: 0.14,           // wet-ice skin
+    sheen: 0.35, sheenColor: new THREE.Color(0xe4f0ff), sheenRoughness: 0.55,
+    iridescence: 0.18, iridescenceIOR: 1.3,
+    specularIntensity: 1.0, envMapIntensity: 0.95,
+    emissive: new THREE.Color(0xffb060), emissiveIntensity: 0,  // the sealed heart's warmth, gated in update
     transparent: true
   });
   texLoader.load('assets/env/ice-macro.jpg', (t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2.5, 2.5);
-    iceMat.bumpMap = t; iceMat.bumpScale = 0.02;        // hairline fractures on every facet
+    t.repeat.set(1.6, 1.6);
+    iceMat.bumpMap = t; iceMat.bumpScale = 0.02;        // frosted-glass surface relief
     iceMat.needsUpdate = true;
-  });
-  /* the GOLD VEINS — Higgsfield kintsugi macro as the emissive map: black
-     areas stay void, the gold filaments alone carry the glow. Until it
-     arrives, emissiveIntensity stays 0 (the update loop gates on veinsReady
-     so an unmapped emissive can never wash the whole mass orange). */
-  texLoader.load('assets/env/gold-veins.jpg', (t) => {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2, 2);
-    t.colorSpace = THREE.SRGBColorSpace;
-    iceMat.emissiveMap = t;
-    iceMat.needsUpdate = true;
-    vault.userData.veinsReady = true;
   });
   const block = new THREE.Mesh(monoGeo, iceMat);
-  block.position.y = 1.18;            // base bites ~0.2 below the plain — grounded, immovable
-  block.rotation.y = 0.32;
-  block.rotation.z = 0.035;           // the faintest lean — calved, not machined
+  block.position.y = 1.32;            // cube centred on the heart — floats between the twins
+  block.rotation.y = 0.42;            // a three-quarter view, one edge toward camera
+  block.rotation.z = 0;               // upright — a clear die of ice, not a calved lean
 
   /* the INNER CORE — a ghost of the monolith suspended inside itself: a
      second, smaller hewn form whose additive edges read as deep internal
@@ -1042,7 +1036,7 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   });
   const core2 = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeo, 24), coreEdgeMat);
   core2.scale.setScalar(0.55);
-  core2.position.set(0.02, 1.24, 0);
+  core2.position.set(0.02, 1.32, 0);
   core2.rotation.y = 0.9;
 
   /* INTERNAL LIGHT SHAFTS — three tall additive blades rising from the base
@@ -1109,20 +1103,46 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
   });
   const fracMatB = fracMat.clone();
-  const fracA = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 1.5), fracMat);
-  fracA.position.set(0.05, 1.25, 0.02); fracA.rotation.set(0.1, 0.9, 0.16);
-  const fracB = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), fracMatB);
-  fracB.position.set(-0.06, 1.0, -0.04); fracB.rotation.set(-0.14, -0.55, -0.1);
+  const fracA = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), fracMat);
+  fracA.position.set(0.06, 1.4, 0.05); fracA.rotation.set(0.1, 0.9, 0.16);
+  const fracB = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.44), fracMatB);
+  fracB.position.set(-0.07, 1.22, -0.05); fracB.rotation.set(-0.14, -0.55, -0.1);
 
-  /* THE HEART, CRYSTALLIZED — the faceted ruby, the single point of colour,
-     painted through the ice so it always glows within. Saturated single-hue
-     red (only R runs hot) so the bloom keeps its COLOUR — never a pink wash. */
-  const gemGeo = new THREE.IcosahedronGeometry(0.095, 0);
+  /* INTERNAL FROST — snowflake dendrites suspended inside the cube: a few
+     small alpha-mapped planes (kept central + small so none projects past the
+     silhouette). depthTest off so they read THROUGH the ice, giving the block
+     the "frost etched inside" character of the finale film. */
+  const frostGroup = new THREE.Group();
+  const frostMats = [];
+  const FROST_PLANES = [
+    { p: [0.0, 1.42, 0.32], r: [0, 0, 0], s: 0.92 },
+    { p: [0.05, 1.24, -0.3], r: [0, 0.5, 0], s: 0.9 },
+    { p: [-0.28, 1.36, 0.05], r: [0.1, 1.1, 0.2], s: 0.86 },
+    { p: [0.28, 1.3, -0.05], r: [0, -0.9, 0.1], s: 0.84 },
+    { p: [0.02, 1.5, -0.05], r: [0.2, 0.2, 0.9], s: 0.8 },
+    { p: [-0.05, 1.18, 0.1], r: [-0.2, 1.5, 0.4], s: 0.82 }
+  ];
+  for (const f of FROST_PLANES) {
+    const m = new THREE.MeshBasicMaterial({
+      alphaMap: frostTex, color: 0xeaf4ff, transparent: true, opacity: 0,
+      depthWrite: false, depthTest: false, side: THREE.DoubleSide
+    });
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(f.s, f.s), m);
+    pl.position.set(...f.p); pl.rotation.set(...f.r);
+    pl.renderOrder = 11;
+    frostGroup.add(pl); frostMats.push(m);
+  }
+
+  /* THE HEART, SEALED IN AMBER — a faceted amber-gold jewel at the cube's
+     centre, painted through the ice so it always glows within (the living
+     heart preserved, frozen in amber to hold the century — amber is the
+     vault's own rare accent, and the finale film's blazing gem). */
+  const gemGeo = new THREE.IcosahedronGeometry(0.145, 0);
   const gemMat = new THREE.MeshPhysicalMaterial({
-    color: 0xff6a4a, metalness: 0.1, roughness: 0.14,
-    emissive: new THREE.Color(0xff3418), emissiveIntensity: 0.6,
-    flatShading: true, envMapIntensity: 1.1,
-    clearcoat: 0.5, clearcoatRoughness: 0.25,
+    color: 0xffbe5c, metalness: 0.15, roughness: 0.1,
+    emissive: new THREE.Color(0xffa020), emissiveIntensity: 1.0,
+    flatShading: true, envMapIntensity: 1.6,
+    clearcoat: 0.7, clearcoatRoughness: 0.15,
     transparent: true, opacity: 0, depthTest: false
   });
   const hMesh = new THREE.Mesh(gemGeo, gemMat);
@@ -1130,16 +1150,16 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   hMesh.position.y = 1.32;            // chest height, deep in the monolith's core
   hMesh.rotation.x = 0.35;
   const gemEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xff9a80, transparent: true, opacity: 0,
+    color: 0xffd18a, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
   });
   const gemEdges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), gemEdgeMat);
   gemEdges.renderOrder = 13;
   hMesh.add(gemEdges);
-  /* a tight, contained ember-halo — saturated red, small (the old 0.62-scale
-     warm-white sprite was the washed-out pink blob) */
+  /* a tight, contained amber halo — the sealed heart's warmth, small (a broad
+     warm-white sprite washes to a pale blob) */
   const hGlow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTexture('rgba(255,64,40,0.95)', 'rgba(255,64,40,0)'),
+    map: glowTexture('rgba(255,170,64,0.95)', 'rgba(255,170,64,0)'),
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0
   }));
   hGlow.position.y = 1.32;
@@ -1277,10 +1297,10 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   const motes = new THREE.Points(moteGeo, moteMat);
   motes.frustumCulled = false;
 
-  vault.add(block, edges, core2, shaftGroup, orbit, fracA, fracB, hMesh, hGlow,
+  vault.add(block, edges, core2, shaftGroup, orbit, fracA, fracB, frostGroup, hMesh, hGlow,
             sealRing, motes);
   vault.userData = {
-    iceMat, edgeMat, fracMat, fracMatB, hMesh, hGlow, gemMat, gemEdgeMat,
+    iceMat, edgeMat, fracMat, fracMatB, frostMats, hMesh, hGlow, gemMat, gemEdgeMat,
     coreEdgeMat, shaftMats, orbit, orbitMat, orbitData, orbitDummy: new THREE.Object3D(),
     bandMat, goldLineMat, sealMat, moteMat, motePos, moteSeed, moteGeo,
     veinsReady: false, hdMats: null, engraveSurge: 0
@@ -1305,45 +1325,32 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     }
   };
 
-  /* THE MUSEUM VAULT — the Higgsfield-sculpted monolith (baked kintsugi
-     texture) replaces the procedural block when it arrives. Its own texture
-     doubles as the emissive map, so the real painted veins carry the pulse.
-     On any failure the procedural block simply remains — never an empty
-     pedestal. */
-  new GLTFLoader().load('assets/models/vault-hd.glb', (g) => {
-    const src = g.scene;
-    const box = new THREE.Box3().setFromObject(src);
-    const size = new THREE.Vector3(); box.getSize(size);
-    const center = new THREE.Vector3(); box.getCenter(center);
-    const s = 2.75 / (size.y || 1);                     // monument height
-    const hdMats = [];
-    src.traverse((o) => {
-      if (!o.isMesh) return;
-      const baked = o.material && o.material.map ? o.material.map : null;
-      if (baked) baked.colorSpace = THREE.SRGBColorSpace;
-      const m = new THREE.MeshPhysicalMaterial({
-        map: baked, color: 0xffffff,
-        emissiveMap: baked, emissive: new THREE.Color(0xffb54a), emissiveIntensity: 0,
-        metalness: 0.35, roughness: 0.22,
-        clearcoat: 1.0, clearcoatRoughness: 0.1,
-        envMapIntensity: 1.4, transparent: true, opacity: 0
-      });
-      o.material = m;
-      hdMats.push(m);
+  /* THE REAL TRANSPARENT CUBE — the exact Higgsfield render, background
+     removed to a clean cutout, composited as a camera-facing billboard. A 3D
+     mesh is always SOLID; only the render carries the true glass transparency,
+     the internal snowflake frost and the glowing amber gem. The finale film
+     picks up the very same cube in macro, so the hand-off is seamless. The
+     procedural cube stays as the fallback if the PNG ever fails (never an
+     empty pedestal). */
+  texLoader.load('assets/env/vault-cube-cutout.png', (tex) => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const cubeMat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, opacity: 0,
+      depthTest: false, depthWrite: false
     });
-    src.scale.setScalar(s);
-    src.position.set(-center.x * s, -box.min.y * s - 0.12, -center.z * s);  // base bites the ice
-    src.rotation.y = 0.26;                              // quarter-turn — the leaning edge faces camera
-    vault.add(src);
-    /* retire the procedural shell — the sculpture owns the plinth now.
-       The heart GEM retires with it (painted-through-depth reads as a
-       sticker on the opaque sculpture); its soft radiance stays, and the
-       ruby itself becomes the finale film's exclusive reveal. */
+    const cubeSprite = new THREE.Sprite(cubeMat);
+    cubeSprite.scale.set(1.5, 1.5, 1);          // sized to sit clear of both figures (±0.92)
+    cubeSprite.position.set(0, 1.28, 0);        // centred between the twins, on the heart line
+    cubeSprite.renderOrder = 10;
+    vault.add(cubeSprite);
+    /* retire every procedural + solid mesh — the render IS the cube now, and
+       its amber gem glows in the render itself (hide the procedural gem too). */
     block.visible = edges.visible = core2.visible = false;
     fracA.visible = fracB.visible = false;
-    hMesh.visible = false;
-    vault.userData.hdMats = hdMats;
-  }, undefined, () => { /* keep the procedural monolith */ });
+    frostGroup.visible = shaftGroup.visible = false;
+    hMesh.visible = hGlow.visible = false;
+    vault.userData.cubeSpriteMat = cubeMat;
+  }, undefined, () => { /* PNG missing — keep the procedural cube */ });
 }
 scene.add(vault);
 
@@ -2429,9 +2436,13 @@ function update(time) {
     vault.scale.setScalar(1);
     const hb = heartbeat(time);
     ud.iceMat.opacity = Math.min(1, moatVis * 1.35);
-    /* the kintsugi breathes: gold seams + vein-map surge with every beat */
+    /* the transparent-cube billboard (the real render) fades in with the beat */
+    if (ud.cubeSpriteMat) ud.cubeSpriteMat.opacity = Math.min(1, moatVis * 1.35);
+    /* frosted-ice edges catch a gold rim; the sealed heart's warmth breathes
+       faintly through the whole clear mass (uniform amber, kept subtle so it
+       never washes the ice orange) */
     ud.edgeMat.opacity = (0.30 + 0.22 * hb) * moatVis;
-    if (ud.veinsReady) ud.iceMat.emissiveIntensity = (0.55 + 0.8 * hb) * moatVis;
+    if (ud.veinsReady) ud.iceMat.emissiveIntensity = (0.05 + 0.10 * hb) * moatVis;
     /* the museum sculpture (once arrived) breathes through its own painted
        veins — the baked kintsugi doubles as the emissive map */
     if (ud.hdMats) for (const m of ud.hdMats) {
@@ -2440,6 +2451,8 @@ function update(time) {
     }
     ud.fracMat.opacity = 0.15 * moatVis;                          // internal cleavage, barely there
     ud.fracMatB.opacity = 0.11 * moatVis;
+    /* internal snowflake frost breathes in as the cube forms */
+    if (ud.frostMats) for (const fm of ud.frostMats) fm.opacity = 0.8 * moatVis;
     /* the kept-object hardware: platinum band + gold hairline + seal ring */
     ud.bandMat.opacity = moatVis;
     ud.goldLineMat.opacity = moatVis;
@@ -2506,26 +2519,10 @@ function update(time) {
       ud.orbitMat.opacity = 0.8 * moatVis * heartUp;
     }
 
-    /* the gold ACCRETES — each nugget scales in on its own cue as the vault
-       grows. Seeded on the procedural surface, so it retires with it when
-       the museum sculpture (a different silhouette) takes the plinth. */
-    if (!ud.hdMats) {
-      const acc = grow * 1.18;
-      const { inst, mat, data, dummy } = vaultCrystals;
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        const sc = clamp01((acc - d.order) / 0.18) * d.s;
-        dummy.position.set(d.x, d.y, d.z);
-        dummy.rotation.set(d.qx, d.qy, 0);
-        dummy.scale.setScalar(Math.max(sc, 1e-4));
-        dummy.updateMatrix();
-        inst.setMatrixAt(i, dummy.matrix);
-      }
-      inst.instanceMatrix.needsUpdate = true;
-      mat.opacity = 0.85 * moatVis;
-    } else {
-      vaultCrystals.mat.opacity = 0;
-    }
+    /* the gold accretion nuggets are RETIRED — they were kintsugi gold seeding
+       over the black shard; on the clear ice cube they read as floating debris.
+       The gold now lives in the plinth, the edge-rim, the motes and the heart. */
+    vaultCrystals.mat.opacity = 0;
 
     /* the vow lands in the world — each phrase at the feet of its subject,
        blurring in as the vault grows, clearing before the finale title card */
