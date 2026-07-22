@@ -2715,11 +2715,12 @@ function update(time) {
     + seg(p, 0.385, 0.403) * (1 - seg(p, 0.412, 0.432)) * 0.45
     /* the breach — the veil blinks as the ice opens and the dive begins */
     + seg(P, 0.596, 0.628) * (1 - seg(P, 0.64, 0.672)) * 0.8
-    /* the arrival — a short blink over the film's hand-off that is FULLY
-       clear before the film releases the frame (0.778): the reveal of the
-       heart must be crisp, not read through frosted glass (jury: the old
-       0.79 clearing blew the arrival to a near-white non-image) */
-    + seg(P, 0.744, 0.758) * (1 - seg(P, 0.764, 0.778)) * 0.42;
+    /* the arrival — retired while the cavern film carries the hand-off
+       (film-to-film continues the very frame, so a veil would only smear
+       it); the blink survives solely as the 404 fallback's softener, when
+       the dive still releases into the live WebGL cavern */
+    + (window.CAVERNFILM?.ready ? 0
+      : seg(P, 0.744, 0.758) * (1 - seg(P, 0.764, 0.778)) * 0.42);
   chromaPass.uniforms.uFrost.value = Math.min(0.85, frost);
   chromaPass.uniforms.uSpace.value = 0;
   chromaPass.uniforms.uTime.value = time;

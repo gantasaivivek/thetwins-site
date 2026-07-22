@@ -276,6 +276,7 @@
         window.VAULTFILM?.setProgress(P);   // THE BREACH — the zoom into the ice
         window.SEALFILM?.setProgress(p);    // the signature macro film (the vow, struck)
         window.DIVEFILM?.setProgress(P);    // the descent film (master-authored)
+        window.CAVERNFILM?.setProgress(P);  // the arrival film (chained from the dive tail)
         window.SOUNDWORLD?.setProgress(P);  // the sound world rides the dive
         window.__scrollP = 0.06;
       } else {
@@ -1113,11 +1114,15 @@
         window.VAULTFILM?.setProgress(P);
         window.SEALFILM?.setProgress(p);
         window.DIVEFILM?.setProgress(P);
-        const dive = window.DIVEFILM, seal = window.SEALFILM, vault = window.VAULTFILM;
+        window.CAVERNFILM?.setProgress(P);
+        const dive = window.DIVEFILM, seal = window.SEALFILM, vault = window.VAULTFILM,
+              cavern = window.CAVERNFILM;
         if (dive) dive.setProgress = () => {};
         if (seal) seal.setProgress = () => {};
         if (vault) vault.setProgress = () => {};
+        if (cavern) cavern.setProgress = () => {};
         if (P > 0.55 && window.__bootDiveFilm) window.__bootDiveFilm();
+        if (P > 0.55 && window.__bootCavernFilm) window.__bootCavernFilm();
         /* the scroll pipeline never runs under freeze, so stage its DOM
            truthfully too: HUD telemetry, topbar state, and the finale vow —
            captures must show what a real scrolling visitor sees */
