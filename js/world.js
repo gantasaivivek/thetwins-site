@@ -3647,6 +3647,42 @@ const _twinChest = new THREE.Vector3();
 let _twinBright = false, _twinProbeDone = false;
 let _twinProbeFrame = 0, _twinBlackStreak = 0, _twinHealthy = 0, _twinHealTries = 0;
 const _probePx = new Uint8Array(4);
+/* FRAME SENTINEL — last line of defense against the poisoned-program
+   roulette: on a context-pressured GPU one random shader program per
+   session can compile broken and paint an opaque black region onto the
+   bright world (it ignores opacity and can rasterize displaced vertices,
+   so no object-level guard can be complete). The surface acts NEVER
+   contain pure black — plain, sky, range and figures all sit far above
+   it. A sparse 15-point grid probe that finds pure black on two
+   consecutive checks forces a context loss; the guarded recovery below
+   reloads ONCE, and the fresh session re-rolls a clean compile. */
+let _fsFrame = 0, _fsStrikes = 0, _fsDone = false, _fsLastBlack = -1;
+const _fsPx = new Uint8Array(4);
+function probeFrame() {
+  if (_fsDone || !figureLoaded || masterP > 0.55 || masterP < 0.02) return;
+  if ((++_fsFrame) % 60 !== 0) return;
+  const gl = renderer.getContext();
+  const W2 = gl.drawingBufferWidth, H2 = gl.drawingBufferHeight;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  let black = 0;
+  for (let gy = 0.30; gy <= 0.71; gy += 0.20) {
+    for (let gx = 0.20; gx <= 0.81; gx += 0.15) {
+      gl.readPixels((gx * W2) | 0, (gy * H2) | 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, _fsPx);
+      if (_fsPx[0] + _fsPx[1] + _fsPx[2] < 33) black++;   /* grain/dither ride ~±4 per channel above true black */
+    }
+  }
+  _fsLastBlack = black;
+  if (black >= 2) {
+    if (++_fsStrikes >= 2) {
+      _fsDone = true;
+      try {
+        if (!sessionStorage.getItem('twinsCtxReload')) renderer.forceContextLoss();
+      } catch (_) { /* storage blocked — do not risk a reload loop */ }
+    }
+  } else {
+    _fsStrikes = 0;
+  }
+}
 function probeTwin() {
   if (_twinProbeDone || !_twinBright || !figureLoaded) return;
   if ((++_twinProbeFrame) % 30 !== 0) return;
@@ -3683,6 +3719,7 @@ function render() {
   update(REDUCED ? 20.0 : clock.getElapsedTime());
   composer.render();
   probeTwin();
+  probeFrame();
 }
 // dev-only: sentinel state for the capture harness
 if (new URLSearchParams(location.search).has('forcetick')) {
@@ -3690,6 +3727,7 @@ if (new URLSearchParams(location.search).has('forcetick')) {
     armed: _twinBright, frame: _twinProbeFrame, black: _twinBlackStreak,
     healthy: _twinHealthy, tries: _twinHealTries, done: _twinProbeDone
   });
+  window.__frameSentinel = () => ({ f: _fsFrame, strikes: _fsStrikes, done: _fsDone, lastBlack: _fsLastBlack });
 }
 function tickLoop() { requestAnimationFrame(tickLoop); fitToStage(); render(); }
 
