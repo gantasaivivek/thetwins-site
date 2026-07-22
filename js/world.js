@@ -97,8 +97,8 @@ const scene = new THREE.Scene();
 const SUN = new THREE.Vector3(5, 2.6, 4).normalize();
 /* THE haze colour: sky horizon, scene fog and the far dissolve share this
    exact Color instance — the "no seam anywhere" contract of the whole world */
-const HAZE = new THREE.Color(0xd6dce4);   // brightened to the range pano's luminous key
-const ZENITH = new THREE.Color(0xa4b4c8);
+const HAZE = new THREE.Color(0xdfe6ee);   // platinum-ice horizon (locked void #E4ECF2 key)
+const ZENITH = new THREE.Color(0xa8c0d4); // soft arctic blue (locked #A8C0D4)
 const fallSpace = (() => {
   const c = document.createElement('canvas'); c.width = 4; c.height = 256;
   const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256);
@@ -277,9 +277,9 @@ const pmrem = new THREE.PMREMGenerator(renderer);
   const c = document.createElement('canvas'); c.width = 256; c.height = 128;
   const g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 128);
-  gr.addColorStop(0.0, '#a4b4c8');    // ZENITH
-  gr.addColorStop(0.48, '#d6dce4');   // HAZE horizon
-  gr.addColorStop(0.56, '#c3cad5');
+  gr.addColorStop(0.0, '#a8c0d4');    // ZENITH — arctic blue
+  gr.addColorStop(0.48, '#dfe6ee');   // HAZE horizon — platinum ice
+  gr.addColorStop(0.56, '#ccd4dc');
   gr.addColorStop(1.0, '#a8b1bf');    // snowfield bounce from below
   g.fillStyle = gr; g.fillRect(0, 0, 256, 128);
   const az = Math.atan2(SUN.z, SUN.x), el = Math.asin(SUN.y);
@@ -678,7 +678,7 @@ const shardMat = new THREE.ShaderMaterial({
   uniforms: {
     uDisperse: { value: 0 }, uTime: { value: 0 }, uAlpha: { value: 0 },
     uCam: { value: new THREE.Vector3() },
-    uFogColor: { value: new THREE.Color(0xc6ccd4) }, uFogD: { value: 0.03 },
+    uFogColor: { value: new THREE.Color(0xccd4dc) }, uFogD: { value: 0.03 },
     uColLo: { value: new THREE.Color(0x8697a8) }, uColHi: { value: new THREE.Color(0xf1f6fc) }
   },
   vertexShader: `
@@ -833,11 +833,11 @@ matHuman.specularIntensity = 0.5;
 matHuman.clearcoat = 0.55;
 matHuman.clearcoatRoughness = 0.4;     // soften the hot clearcoat speculars
 matHuman.iridescence = 0.3;
-matHuman.color = new THREE.Color(0x9db1c6);   // deeper cool ice so the silhouette reads against the snow
-matHuman.sheen = 0.5;
-matHuman.sheenColor = new THREE.Color(0xffd2bd);
-matHuman.emissive = new THREE.Color(0x3a1f24);  // the inner warmth stays — glow retained
-matHuman.emissiveIntensity = 0.16;
+matHuman.color = new THREE.Color(0xb7bcc0);   // LIQUID PLATINUM — cool brushed metal, reads against the snow
+matHuman.sheen = 0.6;
+matHuman.sheenColor = new THREE.Color(0xd4b87a);  // razor-thin GOLD edge-catch skimming the platinum
+matHuman.emissive = new THREE.Color(0x1c2732);   // cool platinum inner glow — the ONE warmth is the heart alone
+matHuman.emissiveIntensity = 0.14;
 
 /* the DIGITAL TWIN: the same premium crystal, cast in gold — the sovereign's
    precious double. Platinum ice skin, molten gold burning in the depths; the
@@ -863,11 +863,10 @@ matTwin.specularIntensity = 1.0;
 matTwin.clearcoat = 0.9;
 matTwin.clearcoatRoughness = 0.15;
 matTwin.iridescence = 0.55;
-matTwin.color = new THREE.Color(0xd09f4e);    /* struck-coin GOLD — the jury read the old
-                                                 champagne 0xc2b294 as tan clay; this sits on
-                                                 the ratified #c9974a with luminance to survive
-                                                 the transmission wash */
-matTwin.specularColor = new THREE.Color(0xffd9a0);   // warm gold speculars, not white plastic
+matTwin.color = new THREE.Color(0xcaa96e);    /* SOFT CHAMPAGNE GOLD (#C9A86C) — the locked accent
+                                                 metal; lighter/cooler than the old struck-coin
+                                                 0xd09f4e so it reads champagne, not brass */
+matTwin.specularColor = new THREE.Color(0xf0dcb0);   // champagne gold speculars, not white plastic
 matTwin.sheen = 0.6;
 matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
 matTwin.emissive = new THREE.Color(0x453312);
@@ -875,8 +874,8 @@ matTwin.emissiveIntensity = 0.38;  /* inner warmth the transmitted gold used to 
 
 /* the twin's golden receive-wave (the human keeps only the chest-top
    heartbeat — its wave stays wired but silent, amp 0 in the drive) */
-pulseWave(matHuman, 0xff5a3a);
-pulseWave(matTwin, 0xffb44e);
+pulseWave(matHuman, 0xff5a3a);      // the human's heartbeat wave — the one red, KEPT
+pulseWave(matTwin, 0xe6c078);       // the twin's receive-wave — champagne gold, not brass
 /* the CUT: gem facets on the twin only — chained after the pulse wave */
 chisel(matTwin, 3.0);
 
@@ -1100,7 +1099,7 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     sheen: 0.35, sheenColor: new THREE.Color(0xe4f0ff), sheenRoughness: 0.55,
     iridescence: 0.18, iridescenceIOR: 1.3,
     specularIntensity: 1.0, envMapIntensity: 0.95,
-    emissive: new THREE.Color(0xffb060), emissiveIntensity: 0,  // the sealed heart's warmth, gated in update
+    emissive: new THREE.Color(0xd8bc84), emissiveIntensity: 0,  // the sealed heart's warmth, gated in update
     transparent: true
   });
   texLoader.load('assets/env/ice-macro.jpg', (t) => {
@@ -1119,7 +1118,7 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
      structure whenever the camera moves (real depth, not a decal) */
   const coreGeo = monoGeo.clone();
   const coreEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xffd9a0, transparent: true, opacity: 0,
+    color: 0xe4cc94, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false
   });
   const core2 = new THREE.LineSegments(new THREE.EdgesGeometry(coreGeo, 24), coreEdgeMat);
@@ -1147,9 +1146,9 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   /* FLOATING MICRO-SLIVERS — a slow orbit of solid-gold flecks circling the
      monument like a court, catching the low sun (instanced, one draw call) */
   const orbitMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffc978, metalness: 1.0, roughness: 0.24,
+    color: 0xd8bc84, metalness: 1.0, roughness: 0.24,
     clearcoat: 0.5, clearcoatRoughness: 0.2,
-    emissive: new THREE.Color(0x7a4d0e), emissiveIntensity: 0.35,
+    emissive: new THREE.Color(0x6f5a2a), emissiveIntensity: 0.35,
     envMapIntensity: 1.7, transparent: true, opacity: 0, depthWrite: false
   });
   const ORBITERS = 22;
@@ -1268,8 +1267,8 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     envMapIntensity: 1.15, transparent: true, opacity: 0
   });
   const goldLineMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffc873, metalness: 1.0, roughness: 0.2,
-    emissive: new THREE.Color(0x8a5a12), emissiveIntensity: 0.4,
+    color: 0xd6ba80, metalness: 1.0, roughness: 0.2,
+    emissive: new THREE.Color(0x7d652e), emissiveIntensity: 0.4,
     envMapIntensity: 1.6, transparent: true, opacity: 0
   });
   /* (a floating waist band was tried and cut — a calved shard has no true
@@ -1496,8 +1495,8 @@ const claimCta = document.getElementById('claim-cta');
 const vaultCrystals = (() => {
   const VEINS = 8, PER = 12, COUNT = VEINS * PER;
   const mat = new THREE.MeshPhysicalMaterial({
-    color: 0xffd9a0, metalness: 0.95, roughness: 0.26,
-    emissive: new THREE.Color(0x8a5a12), emissiveIntensity: 0.4,
+    color: 0xe4cc94, metalness: 0.95, roughness: 0.26,
+    emissive: new THREE.Color(0x7d652e), emissiveIntensity: 0.4,
     clearcoat: 0.5, clearcoatRoughness: 0.22,
     envMapIntensity: 1.6, transparent: true, opacity: 0, depthWrite: false
   });
@@ -1549,7 +1548,7 @@ const vaultCrystals = (() => {
 /* the heart's radiance — seated AT the gem, falloff contained INSIDE the
    monolith so the warmth reads as a glowing core, never a splash on one
    facet edge (the driver tracks it up the rise) */
-const quantumLight = new THREE.PointLight(0xff9440, 0, 2.2, 2);
+const quantumLight = new THREE.PointLight(0xd8bc84, 0, 2.2, 2);
 quantumLight.position.set(0, 1.32, 0);
 scene.add(quantumLight);
 
@@ -2185,8 +2184,8 @@ let _sovVis = 0;
 
 /* the seal ring — platinum struck with gold, waiting for a name */
 const cavRingMat = new THREE.MeshStandardMaterial({
-  color: 0xc9974a, metalness: 0.88, roughness: 0.3, fog: false,
-  emissive: new THREE.Color(0xa5741f), emissiveIntensity: 0.12
+  color: 0xc9a86c, metalness: 0.88, roughness: 0.3, fog: false,
+  emissive: new THREE.Color(0x9a7c40), emissiveIntensity: 0.12
 });
 const cavRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.06, 20, 140), cavRingMat);
 cavRing.rotation.x = Math.PI / 2;
