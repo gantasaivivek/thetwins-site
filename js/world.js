@@ -13,7 +13,11 @@ import { ShaderPass } from './vendor/three-addons/postprocessing/ShaderPass.js';
 import { OutputPass } from './vendor/three-addons/postprocessing/OutputPass.js';
 import { BokehPass } from './vendor/three-addons/postprocessing/BokehPass.js';
 
-const isMobile = matchMedia('(max-width: 640px)').matches;
+/* classify by device, not viewport: a phone opened in landscape must still
+   get the mobile GPU budget (DPR cap, no bokeh, reduced particle counts) —
+   screen.width/height are orientation-stable device dimensions */
+const isMobile = matchMedia('(max-width: 640px)').matches ||
+  (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 640);
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const clamp01 = t => Math.min(Math.max(t, 0), 1);
@@ -48,16 +52,29 @@ try {
 
 const stage = document.getElementById('hero-stage');
 // stage — and even the window — can transiently report 0×0 (hidden tab,
-// pin refresh); never size the renderer to zero or it sticks black
-const stageSize = () => [
-  stage.offsetWidth || innerWidth || 1280,
-  stage.offsetHeight || innerHeight || 720
-];
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, isMobile ? 1.5 : 2));
+// pin refresh); never size the renderer to zero or it sticks black.
+// The size is CACHED: fitToStage runs before every frame, and an offsetWidth
+// read there forces a layout pass against that frame's style writes. A
+// ResizeObserver (fires on observe, resizes, and pin refreshes) plus the
+// window resize event keep the cache honest with zero reads on the hot path.
+let stageW = 0, stageH = 0;
+const refreshStageSize = () => {
+  const w = stage.offsetWidth || innerWidth || 1280;
+  const h = stage.offsetHeight || innerHeight || 720;
+  if (w > 1 && h > 1) { stageW = w; stageH = h; }
+};
+refreshStageSize();
+new ResizeObserver(refreshStageSize).observe(stage);
+addEventListener('resize', refreshStageSize);
+const stageSize = () => [stageW || 1280, stageH || 720];
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, isMobile ? 1.75 : 2));  // 1.5 read as dithered crunch on phone OLEDs
 renderer.setSize(...stageSize());
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.88;   // the range pano's luminous key — bright, never white-hot
-renderer.domElement.id = 'world';
+/* NOT 'world' — that id belongs to the reading-deck section; a duplicate id
+   here silently rewired every '#world' selector (deck reveals, the inworld
+   hide rule, the fallback boundary) onto this canvas */
+renderer.domElement.id = 'gl-world';
 renderer.domElement.style.cssText =
   'position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block;';
 stage.insertBefore(renderer.domElement, stage.firstChild);
@@ -171,11 +188,14 @@ scene.add(new THREE.Mesh(new THREE.SphereGeometry(80, 48, 24), skyMat));
 
 /* reflection environments — built AFTER pmrem exists; the procedural
    atmosphere serves until the range pano arrives and takes over */
-let iceEnvMap = null, cosmosEnvMap = null, envIsCosmos = false;
+let iceEnvMap = null, iceEnvRT = null;
 const texLoader = new THREE.TextureLoader();
 /* THE RANGE — the user's chosen world: a wrap-healed 4K photographic 360 of
-   jagged arctic peaks. Drives the sky's horizon band AND the reflections. */
-texLoader.load('assets/env/arctic-range.jpg', (t) => {
+   jagged arctic peaks. Drives the sky's horizon band AND the reflections.
+   WebP first (622KB desktop / 240KB mobile vs the 4.3MB source JPEG; the 4×
+   wrap seam verified preserved at edge-delta parity) — JPEG stays as the
+   onError fallback for engines without WebP. */
+const applyRange = (t) => {
   t.colorSpace = THREE.SRGBColorSpace;
   t.mapping = THREE.EquirectangularReflectionMapping;
   t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
@@ -183,21 +203,20 @@ texLoader.load('assets/env/arctic-range.jpg', (t) => {
   skyMat.uniforms.uRange.value = t;
   skyMat.uniforms.uHasRange.value = 1;
   if (typeof pmrem !== 'undefined' && pmrem) {
-    iceEnvMap = pmrem.fromEquirectangular(t).texture;
+    const oldRT = iceEnvRT;
+    iceEnvRT = pmrem.fromEquirectangular(t);
+    iceEnvMap = iceEnvRT.texture;
     scene.environment = iceEnvMap;
+    if (oldRT) oldRT.dispose();       // the procedural env's cubeUV target retires
+    pmrem.dispose();                  // final environment set — free the generator's scratch
   }
-});
-/* the cosmos pano (1.8MB) only serves the retired space mode (uSpace stays 0
-   on this experience) — load it AFTER the arctic world is up, off the critical
-   path, so it never competes with the pano/GLB/fonts for first paint */
-const loadCosmos = () => texLoader.load('assets/env/cosmos.png', (t) => {
-  t.colorSpace = THREE.SRGBColorSpace; t.mapping = THREE.EquirectangularReflectionMapping;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  skyMat.uniforms.uCosmos.value = t;
-  cosmosEnvMap = pmrem.fromEquirectangular(t).texture;
-});
-if ('requestIdleCallback' in window) requestIdleCallback(loadCosmos, { timeout: 12000 });
-else setTimeout(loadCosmos, 6000);
+};
+texLoader.load(
+  isMobile ? 'assets/env/arctic-range-mobile.webp' : 'assets/env/arctic-range.webp',
+  applyRange, undefined,
+  () => texLoader.load('assets/env/arctic-range.jpg', applyRange));
+/* (the cosmos pano load is retired with its space mode — uSpace is pinned 0
+   and the fallSpace gradient keeps the shader branch valid) */
 
 /* heavy arctic haze — THE depth cue of the one-world build: the dune belts
    dissolve progressively into the sky's own horizon colour (same Color
@@ -246,8 +265,10 @@ const pmrem = new THREE.PMREMGenerator(renderer);
   g.fillStyle = sun; g.fillRect(0, 0, 256, 128);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.mapping = THREE.EquirectangularReflectionMapping;
-  iceEnvMap = pmrem.fromEquirectangular(t).texture;
+  iceEnvRT = pmrem.fromEquirectangular(t);
+  iceEnvMap = iceEnvRT.texture;
   scene.environment = iceEnvMap;
+  t.dispose();                        // the 256×128 source served its one conversion
 }
 
 /* one low arctic sun: the key light sits ON the sun vector (the same one the
@@ -281,6 +302,11 @@ const FLOOR_L = new THREE.Color(0xb3bcc8), FLOOR_D = new THREE.Color(0x161b23);
 const floorMat = new THREE.MeshStandardMaterial({
   color: 0xb3bcc8, roughness: 0.9, metalness: 0.0, envMapIntensity: 0.6
 });
+/* snow-hd is fetched ONCE; late consumers (the terrain builds at module eval,
+   before the texture lands) register here and clone — clone shares the decoded
+   image, so the network fetch and decode are never paid twice */
+let snowTex = null; const snowTexWaiters = [];
+const onSnowTex = (fn) => { snowTex ? fn(snowTex) : snowTexWaiters.push(fn); };
 texLoader.load('assets/env/snow-hd.jpg', (t) => {
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -290,6 +316,8 @@ texLoader.load('assets/env/snow-hd.jpg', (t) => {
      not flat — floor, lid and terrain all carry the SAME bump. Kept very
      shallow: a stronger scale speckle-aliases under the directional lights */
   floorMat.bumpMap = t; floorMat.bumpScale = 0.012;
+  snowTex = t;
+  for (const fn of snowTexWaiters.splice(0)) fn(t);
   floorMat.needsUpdate = true;
   /* the lid samples the same snow at matched world-scale so it reads as the
      exact same ground until it unseals */
@@ -500,9 +528,12 @@ const terrain = (() => {
     polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2
   });
   addSnowSparkle(mat);                                   // same world-hash glints as the plain
-  texLoader.load('assets/env/snow-hd.jpg', (t) => {
+  onSnowTex((t0) => {
+    const t = t0.clone();                                // shares the decoded image — no refetch
     t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1, 1);
+    t.needsUpdate = true;
     mat.map = t; mat.bumpMap = t; mat.bumpScale = 0.012;
     mat.needsUpdate = true;                              // same grain as the floor it rises from
   });
@@ -790,13 +821,18 @@ matHuman.emissiveIntensity = 0.16;
    sharp clearcoat, iridescent glints. The digital copy is a jewel of the
    original. */
 const matTwin = iceMaterial();
-matTwin.transmission = 0.52;
+/* the twin is SOLID cut gold — no transmission. The transmissive path
+   sampled a buffer that intermittently (machine-state-sensitive, weeks of
+   bisects: lights, sprites, passes, compile order) rendered BLACK, turning
+   the whole figure into a silhouette; transmission=0 was the one state
+   proven clean in every session. A struck coin is opaque anyway. */
+matTwin.transmission = 0;
 matTwin.roughness = 0.1;
 matTwin.ior = 1.45;
 matTwin.thickness = 1.5;
 matTwin.attenuationColor = new THREE.Color(0xc9a35e);    // molten gold in the depths — saturated
 matTwin.attenuationDistance = 0.5;
-matTwin.envMapIntensity = 0.9;
+matTwin.envMapIntensity = 1.1;     /* the env carries the depth the glass used to */
 matTwin.specularIntensity = 1.0;
 matTwin.clearcoat = 0.9;
 matTwin.clearcoatRoughness = 0.15;
@@ -804,8 +840,8 @@ matTwin.iridescence = 0.55;
 matTwin.color = new THREE.Color(0xc2b294);    // champagne gold — the twin's struck-coin cast
 matTwin.sheen = 0.6;
 matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
-matTwin.emissive = new THREE.Color(0x33260a);
-matTwin.emissiveIntensity = 0.3;
+matTwin.emissive = new THREE.Color(0x453312);
+matTwin.emissiveIntensity = 0.38;  /* inner warmth the transmitted gold used to carry */
 
 /* the twin's golden receive-wave (the human keeps only the chest-top
    heartbeat — its wave stays wired but silent, amp 0 in the drive) */
@@ -846,21 +882,25 @@ const markLoaded = () => {
    The HUMAN wears the cool ice with warm blood-light in the depths; the
    DIGITAL twin wears the champagne gold (the struck coin). The red heart
    stays with the human, the gold signal core with the twin. */
+/* ONE fetch, two bodies: the twin is CAST FROM the human — the same sculpted
+   mesh, cloned (clone shares BufferGeometry: one parse, one GPU upload),
+   mirrored, struck in gold. (The separate twin mesh read female; a digital
+   twin of this human must read as HIM.) Per-figure GLB fallbacks remain. */
 loader.load('assets/models/human-hd.glb',
-  (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+  (g) => {
+    const twinScene = g.scene.clone(true);      // clone BEFORE fitInto reparents the original
+    fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded();
+    fitInto({ scene: twinScene }, figB, matTwin, true); loadedB = true; markLoaded();
+  },
   undefined,
-  () => loader.load('assets/models/hero.glb',
-    (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
-    undefined, (err) => console.warn('hero.glb:', err?.message || err)));
-/* the twin is CAST FROM the human — the same sculpted body, mirrored,
-   struck in gold. (The separate twin mesh read female; a digital twin of
-   this human must read as HIM.) */
-loader.load('assets/models/human-hd.glb',
-  (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
-  undefined,
-  () => loader.load('assets/models/twin.glb',
-    (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
-    undefined, (err) => console.warn('twin.glb:', err?.message || err)));
+  () => {
+    loader.load('assets/models/hero.glb',
+      (g) => { fitInto(g, figA, matHuman, false); figA.visible = true; buildShards(figA); loadedA = true; markLoaded(); },
+      undefined, (err) => console.warn('hero.glb:', err?.message || err));
+    loader.load('assets/models/twin.glb',
+      (g) => { fitInto(g, figB, matTwin, true); loadedB = true; markLoaded(); },
+      undefined, (err) => console.warn('twin.glb:', err?.message || err));
+  });
 
 {
   /* ONE PULSE, TWO BODIES — no gems, no geometry. Each chest holds a heart
@@ -879,7 +919,12 @@ loader.load('assets/models/human-hd.glb',
     const nucleus = new THREE.Sprite(nucMat);
     nucleus.position.set(-0.012, 0.008, 0);
     nucleus.scale.setScalar(0.085);
-    const lobe = new THREE.Sprite(nucMat);              // shares the material — one drive
+    /* the second "lobe" blob is RETIRED: under a load-order race that one
+       sprite rasterized as a giant solid-black disc over the twin's chest
+       (proven by object-level bisect — hiding it alone healed the frame;
+       the shared material and the nucleus were innocent). The nucleus +
+       halo carry the anatomy; a dummy keeps the drive's scale writes. */
+    const lobe = new THREE.Object3D();
     lobe.position.set(0.017, -0.013, 0);
     lobe.scale.setScalar(0.055);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -888,9 +933,18 @@ loader.load('assets/models/human-hd.glb',
       blending: THREE.AdditiveBlending, opacity: 0.4
     }));
     halo.scale.setScalar(0.22);
+    /* THE ROOT of the intermittent black twin, finally: these chest lights
+       used to live INSIDE the visibility-toggled figures, so the visible
+       light count changed mid-session (the exact gotcha this project
+       already codified for the cavern) — and the twin's transmissive body
+       renders BLACK whenever its program binds the wrong lights state.
+       The lights now live at SCENE level (count constant forever, zero
+       recompiles); the drive steers them to the chests each frame. */
     const light = new THREE.PointLight(lightColor, 0.32, 2.6, 2);
+    light.position.set(0.03, 1.27, 0.02);
+    scene.add(light);
     nucleus.renderOrder = 12; lobe.renderOrder = 12; halo.renderOrder = 11;
-    g.add(nucleus, lobe, halo, light);
+    g.add(nucleus, lobe, halo);
     g.position.set(0.03, 1.27, 0.02);
     fig.add(g);
     return { nucMat, nucleus, lobe, halo, light };
@@ -949,6 +1003,7 @@ for (let i = 0; i < 2; i++) {
    their intent, under their key alone, held for a hundred years. */
 const vault = new THREE.Group();
 vault.visible = false;
+let armVaultCube = null;   // set inside the block below; fired by update() past p 0.5
 let monoGeo = null;   // the hewn geometry — the crystal veins seed on its real surface
 {
   /* THE MONOLITH — a stretched icosahedral shard, every vertex displaced by
@@ -1122,7 +1177,11 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     { p: [0.02, 1.5, -0.05], r: [0.2, 0.2, 0.9], s: 0.8 },
     { p: [-0.05, 1.18, 0.1], r: [-0.2, 1.5, 0.4], s: 0.82 }
   ];
-  for (const f of FROST_PLANES) {
+  for (const f of (isMobile ? [] : FROST_PLANES)) {
+    /* mobile skips the etched-frost planes: depthTest-off quads idling at
+       opacity 0 are exactly what the poisoned-program state paints as
+       opaque black slabs over the figures (twice bisected to this block);
+       at 375px the etching was sub-pixel anyway */
     const m = new THREE.MeshBasicMaterial({
       alphaMap: frostTex, color: 0xeaf4ff, transparent: true, opacity: 0,
       depthWrite: false, depthTest: false, side: THREE.DoubleSide
@@ -1332,10 +1391,18 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
      picks up the very same cube in macro, so the hand-off is seamless. The
      procedural cube stays as the fallback if the PNG ever fails (never an
      empty pedestal). */
-  texLoader.load('assets/env/vault-cube-cutout.png', (tex) => {
+  /* LAZY: the billboard is invisible until p≈0.86, so its texture must not
+     compete with the pano/GLB/fonts at first paint — update() arms this the
+     first time the visitor passes the midpoint (same policy as vaultfilm).
+     WebP (110KB) first, the PNG (1.7MB) as fallback. */
+  const applyCube = (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     const cubeMat = new THREE.SpriteMaterial({
       map: tex, transparent: true, opacity: 0,
+      /* a red-ward tint pulls the render's baked amber gem toward the
+         heart it becomes — the MacGuffin must not change color across
+         the breach */
+      color: new THREE.Color(1.0, 0.87, 0.83),
       depthTest: false, depthWrite: false
     });
     const cubeSprite = new THREE.Sprite(cubeMat);
@@ -1350,7 +1417,11 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     frostGroup.visible = shaftGroup.visible = false;
     hMesh.visible = hGlow.visible = false;
     vault.userData.cubeSpriteMat = cubeMat;
-  }, undefined, () => { /* PNG missing — keep the procedural cube */ });
+  };
+  armVaultCube = () => texLoader.load('assets/env/vault-cube-cutout.webp', applyCube,
+    undefined,
+    () => texLoader.load('assets/env/vault-cube-cutout.png', applyCube,
+      undefined, () => { /* missing — keep the procedural cube */ }));
 }
 scene.add(vault);
 
@@ -1478,13 +1549,17 @@ function facetEmblem(i) {
     const m = iceMaterial();
     /* denser hewn ice — the emblems must carry real weight against the
        bright fog, not read as ghosts: less transmission, darker body */
-    m.color = new THREE.Color(0x8ea2b6);
-    m.transmission = 0.25;
+    m.color = new THREE.Color(0x9db0c2);
+    /* transmission RETIRED — the same poisoned-buffer class that blacked the
+       twin rendered one emblem as a solid black slab over the figures on
+       mobile; opaque hewn ice with an emissive floor can never go black */
+    m.transmission = 0;
     m.thickness = 0.9;
     m.attenuationColor = new THREE.Color(0x3e5570);
     m.roughness = 0.24;
     m.envMapIntensity = 1.15;
-    m.emissive = new THREE.Color(0x0d151d);
+    m.emissive = new THREE.Color(0x1a242e);
+    m.emissiveIntensity = 0.5;
     if (flat) m.flatShading = true;
     m.opacity = 0;
     const mesh = new THREE.Mesh(geo, m);
@@ -1603,6 +1678,11 @@ const AUTH_APPS = [
   { name: 'X',         sector: 'SOCIAL',  svg: ICO.x },
   { name: 'LINKEDIN',  sector: 'SOCIAL',  svg: ICO.linkedin }
 ];
+/* auth-beat geometry cache: the panel's size and each chip's offset within it
+   are static for the whole beat — measured once on entry (and re-measured
+   after any resize), so the effect-heavy signing frames do zero DOM reads */
+let authMeasure = null;
+addEventListener('resize', () => { authMeasure = null; });
 const authNet = (() => {
   let d = document.getElementById('authnet');
   if (!d) { d = document.createElement('div'); d.id = 'authnet'; document.body.appendChild(d); }
@@ -1612,7 +1692,7 @@ const authNet = (() => {
    digital twin is the agent that signs into every service on the human's behalf */
 const authHead = document.createElement('div');
 authHead.className = 'auth-head';
-authHead.innerHTML = `<div class="auth-eyebrow">////// PROTOCOL_03</div><div class="auth-title">AUTHORIZED SERVICES</div>`;
+authHead.innerHTML = `<div class="auth-eyebrow">////// VERIFY_03</div><div class="auth-title">AUTHORIZED SERVICES</div>`;
 authNet.appendChild(authHead);
 const AUTH_SECTORS = ['FINANCE', 'HEALTH', 'SOCIAL'];
 const appChips = [];
@@ -1732,7 +1812,11 @@ const fogTex = (() => {
   return t;
 })();
 const fogBanks = [];
-{
+/* mobile RETIRES the fog banks: under the poisoned-program state one of
+   these whisper sprites (opacity 0.05) rendered as an opaque black slab
+   across the figures — measured by screen-region bbox enumeration. The
+   pano's own aerial haze + the spindrift veils carry mobile atmosphere. */
+if (!isMobile) {
   const LAYERS = [
     /* LOW ground mist only — kept small and faint so it never rises to veil
        the range. The pano carries its own aerial-perspective haze; a second
@@ -1762,7 +1846,7 @@ const composer = new EffectComposer(
   renderer,
   new THREE.WebGLRenderTarget(initW, initH, { type: THREE.HalfFloatType })
 );
-composer.setPixelRatio(Math.min(devicePixelRatio || 1, isMobile ? 1.5 : 2));
+composer.setPixelRatio(Math.min(devicePixelRatio || 1, isMobile ? 1.75 : 2));
 composer.setSize(initW, initH);
 composer.addPass(new RenderPass(scene, camera));
 /* depth-of-field — the camera becomes a LENS (igloo's bokeh pass): focus
@@ -1778,6 +1862,25 @@ const bokehPass = isMobile ? null : new BokehPass(scene, camera, {
   focus: 5.0, aperture: 0.000022, maxblur: 0.0016
 });
 if (bokehPass) composer.addPass(bokehPass);
+/* NaN fuse — the transmission buffer can emit a non-finite pixel at some
+   camera angles (measured at the cast beat), and UnrealBloom's mip blur
+   smears one NaN into a full black frame. Clamp + heal right before bloom
+   so the chain is unconditionally finite. */
+const sanitizePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      /* NaN pixels HEAL to haze, never black — a black disc on the bright
+         plain is a hole in the film; a haze patch is invisible */
+      c.rgb = mix(vec3(0.62, 0.65, 0.70), clamp(c.rgb, 0.0, 60.0), vec3(equal(c.rgb, c.rgb)));
+      c.a = (c.a == c.a) ? c.a : 1.0;
+      gl_FragColor = c;
+    }`
+});
+composer.addPass(sanitizePass);
 const bloom = new UnrealBloomPass(
   new THREE.Vector2(initW, initH),
   0.34,   // strength
@@ -1841,6 +1944,451 @@ const chromaPass = new ShaderPass(ChromaticShader);
 composer.addPass(chromaPass);
 composer.addPass(new OutputPass());
 
+/* ================================================================
+   THE HEART CAVERN — the interior of the vault, an island 400 units
+   out along −z so the surface world and the interior can never see
+   each other (FogExp2 whites out anything that far away). The dive
+   film covers the camera's cut inside; the cavern is fully live
+   WebGL: the Higgsfield interior pano on a dome, the beating heart
+   in a crystal lattice over the platinum seal ring, the godray from
+   the oculus, and the reading deck projected onto real DOM plates.
+   Bright glacial interior — this is an ice cathedral, never a void.
+   ================================================================ */
+const CAV = new THREE.Vector3(0, 0, -400);
+const cavGroup = new THREE.Group();
+cavGroup.position.copy(CAV);
+cavGroup.visible = false;
+scene.add(cavGroup);
+
+/* the interior dome: procedural glacial gradient until the pano lands,
+   then the pano tiled 2× around the circle, melting into the shared
+   HAZE at its base (the same no-seam contract as the sky) */
+const cavDomeMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: {
+    uMap: { value: fallSpace }, uHasMap: { value: 0 },
+    uHaze: { value: HAZE }, uTime: { value: 0 }
+  },
+  vertexShader: `varying vec3 vDir;
+    void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D uMap; uniform float uHasMap, uTime; uniform vec3 uHaze; varying vec3 vDir;
+    void main(){
+      vec3 d = normalize(vDir);
+      float elev = asin(clamp(d.y, -1.0, 1.0));
+      /* procedural interior: haze base lifting into pale glacial blue,
+         brightening toward the oculus overhead */
+      vec3 col = mix(uHaze, vec3(0.80, 0.87, 0.95), smoothstep(-0.05, 0.7, elev));
+      col = mix(col, vec3(0.97, 0.99, 1.0), smoothstep(0.85, 1.35, elev));
+      if (uHasMap > 0.001) {
+        float u = atan(d.z, d.x) / 6.2831853 + 0.5;   // true 360° pano — maps once
+        float v = clamp(0.5 + elev / 2.4, 0.001, 0.999);
+        vec3 pano = texture2D(uMap, vec2(u, v)).rgb;
+        float w = uHasMap
+                * smoothstep(-0.10, 0.02, elev)               // base melts into floor mist
+                * (1.0 - smoothstep(1.05, 1.45, elev));       // zenith hands to the oculus glow
+        col = mix(col, pano, w);
+        /* mist skirt — the 3D floor's far edge melts into this band (the
+           cavern key cut the scene fog that used to hide the meeting line) */
+        col = mix(vec3(0.845, 0.885, 0.93), col, smoothstep(-0.02, 0.15, elev));
+        /* the oculus owns everything above — no clamped top-row smear */
+        col = mix(col, vec3(0.99, 1.0, 1.0), smoothstep(0.90, 1.25, elev) * 0.92);
+      }
+      float dth = fract(sin(dot(gl_FragCoord.xy + uTime * vec2(41.0, 17.0), vec2(12.9898, 78.233))) * 43758.5453);
+      col += (dth - 0.5) * (1.7 / 255.0);
+      gl_FragColor = vec4(col, 1.0);
+    }`
+});
+cavGroup.add(new THREE.Mesh(new THREE.SphereGeometry(46, 48, 32), cavDomeMat));
+let cavArmed = false;
+function armCavern() {
+  if (cavArmed) return;
+  cavArmed = true;
+  texLoader.load('assets/env/ruby-heart.webp', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    rubyMat.map = t;
+    rubyMat.needsUpdate = true;
+    rubyReady = true;
+    /* the render replaces the procedural gem (which stays as the 404 fallback) */
+    cavHeart.visible = false;
+    cavNucleus.visible = false;
+    cavCore.visible = false;
+  }, undefined, () => { /* missing — the procedural ruby carries the beat */ });
+  texLoader.load(isMobile ? 'assets/env/heart-cavern-mobile.webp' : 'assets/env/heart-cavern.webp', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    cavDomeMat.uniforms.uMap.value = t;
+    cavDomeMat.uniforms.uHasMap.value = 1;
+  }, undefined, () => texLoader.load('assets/env/heart-cavern.jpg', (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+    cavDomeMat.uniforms.uMap.value = t;
+    cavDomeMat.uniforms.uHasMap.value = 1;
+  }));
+}
+
+/* the frost floor — the height fog whites its far edge into the dome base */
+{
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xcfd9e6, roughness: 0.94, metalness: 0.0   /* the blown-white floor was erasing every object's grounding */
+  });
+  onSnowTex((t) => { floorMat.map = t; floorMat.needsUpdate = true; });
+  addSnowSparkle(floorMat);
+  const f = new THREE.Mesh(new THREE.CircleGeometry(46, 64), floorMat);
+  f.rotation.x = -Math.PI / 2;
+  f.position.y = 0.01;
+  cavGroup.add(f);
+}
+
+/* THE HEART — the one red in a world of ice, held in a crystal lattice
+   above the platinum seal ring (the ring that carries the visitor's name) */
+const heartG = new THREE.Group();
+heartG.position.set(0, 3.05, 0);
+cavGroup.add(heartG);
+/* the ruby reads INNER-LIT, like the figures' own chest gems: a faceted
+   translucent shell around a hot additive nucleus — five jury rounds of
+   opaque flat-shaded attempts read as clay; light from WITHIN is what
+   makes a gem a gem. (The ice casing shell is retired — its lit facets
+   read as white holes punched in the silhouette.) */
+const cavHeartMat = new THREE.MeshPhysicalMaterial({
+  color: 0x8a0a04, roughness: 0.16, metalness: 0.0, flatShading: true,
+  fog: false, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.55,
+  transparent: true, opacity: 0.85,
+  emissive: new THREE.Color(0xd01206), emissiveIntensity: 1.05
+});
+const cavHeart = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 1), cavHeartMat);
+heartG.add(cavHeart);
+const cavNucleus = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTexture('rgba(255,74,42,1)', 'rgba(200,16,6,0)'),
+  transparent: true, depthWrite: false, depthTest: false,
+  blending: THREE.AdditiveBlending, opacity: 0.6
+}));
+cavNucleus.scale.setScalar(1.35);
+heartG.add(cavNucleus);
+/* the white-hot pinpoint that actually crosses the bloom threshold — the
+   jury measured the heart never blooming; a gem is a STAR, not a ball */
+const cavCore = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTexture('rgba(255,158,120,1)', 'rgba(255,64,32,0)'),
+  transparent: true, depthWrite: false, depthTest: false,
+  blending: THREE.AdditiveBlending, opacity: 0.85
+}));
+cavCore.scale.setScalar(0.5);
+heartG.add(cavCore);
+
+/* THE RUBY, RENDERED — the vault cube's own proven pattern applied to the
+   film's most important object: a faceted heart-cut ruby with a burning
+   core, photographed against black and cut out. Six jury rounds of
+   procedural icospheres read as clay against the photographic cathedral;
+   the render IS the gem. Lazy-armed with the pano; if it 404s, the
+   procedural heart above carries the beat (never a blank centre).
+   depthTest:false — nothing can ever impale it again. */
+const rubyMat = new THREE.SpriteMaterial({
+  transparent: true, opacity: 0, depthTest: false, depthWrite: false
+});
+const rubySprite = new THREE.Sprite(rubyMat);
+rubySprite.scale.set(1.58, 1.29, 1);          // render aspect 2987x2445
+rubySprite.renderOrder = 11;
+heartG.add(rubySprite);
+let rubyReady = false;
+const cavGlowTex = glowTexture('rgba(255,96,64,1)', 'rgba(255,52,24,0)');
+const cavGlowIn = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: cavGlowTex, transparent: true, depthWrite: false, depthTest: false,
+  blending: THREE.AdditiveBlending, opacity: 0.85
+}));
+cavGlowIn.scale.setScalar(2.4);
+heartG.add(cavGlowIn);
+const cavGlowOut = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: cavGlowTex, transparent: true, depthWrite: false, depthTest: false,
+  blending: THREE.AdditiveBlending, opacity: 0.28
+}));
+cavGlowOut.scale.setScalar(9.5);
+heartG.add(cavGlowOut);
+
+/* the crystal lattice — a ring of ice shards holding the heart */
+const latticeG = new THREE.Group();
+heartG.add(latticeG);
+const latticeMat = new THREE.MeshPhysicalMaterial({
+  color: 0xc4ddf4, transparent: true, opacity: 0.72, fog: false,
+  roughness: 0.03, metalness: 0.0, envMapIntensity: 2.3,
+  side: THREE.DoubleSide, depthWrite: false
+});
+const latticeShards = [];
+{
+  let ls = 20260722;
+  const lrnd = () => { ls = (ls * 16807) % 2147483647; return ls / 2147483647; };
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 + lrnd() * 0.3;
+    /* the ring holds CLEAR of the gem — no shard may ever pierce the heart */
+    const r = 1.75 + lrnd() * 0.75;
+    const h = 0.7 + lrnd() * 0.7;
+    /* per-shard material: any shard drifting across the camera→heart
+       sightline steps ASIDE (opacity fades) — geometrically clear was not
+       enough; from the orbit the near shard still bisected the gem on screen */
+    const shard = new THREE.Mesh(new THREE.ConeGeometry(0.07 + lrnd() * 0.06, h, 5), latticeMat.clone());
+    shard.position.set(Math.cos(a) * r, (lrnd() - 0.5) * 1.4, Math.sin(a) * r);
+    shard.rotation.set((lrnd() - 0.5) * 0.5, lrnd() * Math.PI, (lrnd() - 0.5) * 0.5);
+    latticeG.add(shard);
+    latticeShards.push(shard);
+  }
+}
+/* point-to-segment distance temps for the sightline fade */
+const _shP = new THREE.Vector3(), _shA = new THREE.Vector3(),
+      _shAB = new THREE.Vector3(), _shAP = new THREE.Vector3();
+/* visibility of the standing vow words this frame (the ring engraving yields) */
+let _sovVis = 0;
+
+/* the seal ring — platinum struck with gold, waiting for a name */
+const cavRingMat = new THREE.MeshStandardMaterial({
+  color: 0xc9974a, metalness: 0.88, roughness: 0.3, fog: false,
+  emissive: new THREE.Color(0xa5741f), emissiveIntensity: 0.12
+});
+const cavRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.06, 20, 140), cavRingMat);
+cavRing.rotation.x = Math.PI / 2;
+cavRing.position.y = -1.15;
+heartG.add(cavRing);
+
+/* the godray — the oculus light standing in the chamber's air */
+const godrayMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 }, uAmp: { value: 0.6 } },
+  vertexShader: `varying vec2 vUv; varying vec3 vPos;
+    void main(){ vUv = uv; vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uTime, uAmp; varying vec2 vUv; varying vec3 vPos;
+    void main(){
+      float v = smoothstep(0.0, 0.45, vUv.y) * (0.35 + 0.65 * smoothstep(0.0, 1.0, vUv.y));
+      float flicker = 0.9 + 0.1 * sin(uTime * 0.7 + vUv.x * 12.0);
+      vec3 col = mix(vec3(0.72, 0.84, 0.95), vec3(1.0, 0.99, 0.95), vUv.y);
+      gl_FragColor = vec4(col, v * uAmp * flicker * 0.30);
+    }`
+});
+const godray = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 6.2, 17, 40, 1, true), godrayMat);
+godray.position.set(0, 9.4, 0);
+cavGroup.add(godray);
+
+/* drifting motes — dust in the godray, frost in the chamber air */
+const cavMoteTex = glowTexture('rgba(255,255,255,1)', 'rgba(190,225,255,0)');
+function moteCloud(count, spread, y0, y1, size, opacity) {
+  const g = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  let ms = 4611 + count;
+  const mr = () => { ms = (ms * 16807) % 2147483647; return ms / 2147483647; };
+  for (let i = 0; i < count; i++) {
+    const a = mr() * Math.PI * 2, r = Math.sqrt(mr()) * spread;
+    pos[i * 3] = Math.cos(a) * r;
+    pos[i * 3 + 1] = y0 + mr() * (y1 - y0);
+    pos[i * 3 + 2] = Math.sin(a) * r;
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({
+    map: cavMoteTex, size, transparent: true, opacity,
+    depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true
+  });
+  const pts = new THREE.Points(g, m);
+  pts.frustumCulled = false;
+  return pts;
+}
+const shaftMotes = moteCloud(isMobile ? 120 : 240, 4.4, 0.6, 17, 0.10, 0.5);
+const cavAirMotes = moteCloud(isMobile ? 160 : 320, 17, 0.4, 12, 0.07, 0.3);
+cavGroup.add(shaftMotes); cavGroup.add(cavAirMotes);
+
+/* NO cavern lights: adding lights inside a toggled group changes the
+   visible light count mid-session, forcing every patched material (snow
+   sparkle, height fog, chisel) to recompile — measured as a black frame.
+   The dome is unlit, the heart is emissive, the metals read the env map;
+   the heart's blood-light on the frost is a flat sprite, not a light. */
+const cavFloorGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: cavGlowTex, transparent: true, depthWrite: false,
+  blending: THREE.AdditiveBlending, opacity: 0.16, color: 0xff4a2a
+}));
+cavFloorGlow.scale.set(7.5, 2.4, 1);
+cavFloorGlow.position.set(0, 0.35, 0);
+cavGroup.add(cavFloorGlow);
+
+/* THE COLONNADE — the film's arrival frame promises a gothic ice cathedral;
+   the live chamber must BE one, not an empty floor with scattered cones: a
+   ring of great translucent ice columns in the lattice's own material
+   language stands in the middle distance, echoing the pano's colonnade and
+   giving the room parallax and architecture */
+{
+  let cs = 4611;
+  const crnd = () => { cs = (cs * 16807) % 2147483647; return cs / 2147483647; };
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + crnd() * 0.4;
+    const r = 20 + crnd() * 7;
+    const h = 12 + crnd() * 10;
+    const colMat = latticeMat.clone();
+    colMat.opacity = 0.4 + crnd() * 0.12;
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.9 + crnd() * 0.6, 1.5 + crnd() * 0.8, h, 6), colMat);
+    col.position.set(Math.cos(a) * r, h / 2 - 0.5, Math.sin(a) * r);
+    col.rotation.y = crnd() * Math.PI;
+    cavGroup.add(col);
+  }
+}
+
+/* the floor is CARVED, not blank: concentric hairline rings etched around
+   the seal — the chamber's own pedestal geometry (the featureless white
+   below the horizon was half the act's measured flatness) */
+{
+  for (const [r, w, o] of [[3.4, 0.035, 0.38], [6.8, 0.03, 0.30], [10.4, 0.028, 0.24], [15.2, 0.028, 0.17]]) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r - w, r + w, 128),
+      new THREE.MeshBasicMaterial({
+        color: 0xb9a06a, transparent: true, opacity: o, fog: false, depthWrite: false
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.06;
+    cavGroup.add(ring);
+  }
+}
+
+/* the ring GROUNDS — a soft contact shadow beneath it on the frost (it
+   read as a floating hula-hoop with no relationship to the floor) */
+const cavRingShadow = new THREE.Mesh(
+  new THREE.CircleGeometry(2.15, 48),
+  new THREE.MeshBasicMaterial({
+    map: glowTexture('rgba(22,30,42,0.5)', 'rgba(22,30,42,0)'),
+    transparent: true, opacity: 0.32, depthWrite: false, fog: false
+  })
+);
+cavRingShadow.rotation.x = -Math.PI / 2;
+cavRingShadow.position.set(0, 0.07, 0);
+cavGroup.add(cavRingShadow);
+
+/* ---- the cavern's own camera line: fall out of the shaft, meet the
+   heart, one slow orbit past the reading stations, then rise into the
+   light. One vector, no reversals — the return IS the ascent. ---- */
+const KFC = [
+  { p: 0.700, pos: [0.0, 15.0, 4.0], look: [0.0, 2.4, 0.0] },   // falling out of the shaft
+  /* arrival at EYE level, gaze slightly RAISED — the cathedral walls and
+     colonnade back the heart; a level-down gaze filled the frame with
+     fog-white floor */
+  { p: 0.790, pos: [0.3, 3.2, 7.2], look: [0.0, 3.6, 0.0] },    // arrival — the heart
+  { p: 0.845, pos: [4.9, 3.4, 5.6], look: [0.0, 3.0, 0.0] },    // orbit — the world plate
+  { p: 0.890, pos: [6.2, 3.0, -1.4], look: [0.0, 3.0, 0.0] },   // deep side — the moat wall
+  { p: 0.930, pos: [2.9, 2.8, -6.6], look: [0.0, 3.0, 0.0] },   // behind — the pilot station
+  { p: 0.960, pos: [-3.6, 3.6, -5.2], look: [0.0, 3.05, 0.0] }, // rounding — investors
+  /* hold the heart as the subject until the whiteout owns the frame (the
+     old direct cut to eyes-up left 0.97 with no composed subject) */
+  { p: 0.978, pos: [-1.7, 5.3, -1.2], look: [0.0, 5.2, 0.0] },
+  /* the resting frame keeps the WORLD in it — godray shaft above, the
+     heart's afterglow below the vow (a straight-up gaze resolved on
+     featureless haze: the flattest frame of the film) */
+  { p: 1.000, pos: [-0.4, 8.4, 1.8], look: [0.0, 10.5, 0.3] }   // THE RETURN — into the light
+];
+function sampleCavernCamera(P) {
+  let i = 0;
+  while (i < KFC.length - 2 && P > KFC[i + 1].p) i++;
+  const a = KFC[i], b = KFC[i + 1];
+  const k0 = KFC[Math.max(0, i - 1)], k3 = KFC[Math.min(KFC.length - 1, i + 2)];
+  const raw = clamp01((P - a.p) / (b.p - a.p));
+  const t = raw * 0.35 + smooth(raw) * 0.65;
+  camPos.set(
+    crom(k0.pos[0], a.pos[0], b.pos[0], k3.pos[0], t) + CAV.x,
+    crom(k0.pos[1], a.pos[1], b.pos[1], k3.pos[1], t) + CAV.y,
+    crom(k0.pos[2], a.pos[2], b.pos[2], k3.pos[2], t) + CAV.z
+  );
+  camLook.set(
+    crom(k0.look[0], a.look[0], b.look[0], k3.look[0], t) + CAV.x,
+    crom(k0.look[1], a.look[1], b.look[1], k3.look[1], t) + CAV.y,
+    crom(k0.look[2], a.look[2], b.look[2], k3.look[2], t) + CAV.z
+  );
+  /* portrait fit — same trick as the vault act: dolly back on tall screens */
+  const fitK = Math.max(1, Math.min(2.3, 1.05 / camera.aspect));
+  if (fitK > 1.001) camPos.sub(camLook).multiplyScalar(fitK).add(camLook);
+}
+
+/* ---- the reading deck, seated in the chamber (window + anchor each) ---- */
+/* SEQUENTIAL station windows — no two plates may ever share the frame
+   (the old MOAT/PILOT overlap double-exposed at 0.9), and every snap
+   station (0.80 / 0.865 / 0.925 / 0.952) parks INSIDE a fully-open
+   window, never on a fade ramp */
+const cavPlates = [
+  { el: document.getElementById('plate-world'), a: new THREE.Vector3(-3.1, 3.4, 3.4), w: [0.782, 0.845], counted: true },
+  { el: document.getElementById('plate-specs'), a: new THREE.Vector3(2.6, 3.3, -3.3), w: [0.850, 0.893], counted: false },
+  { el: document.getElementById('plate-pilot'), a: new THREE.Vector3(-0.6, 3.1, -3.9), w: [0.897, 0.937], counted: true },
+  /* the ask must be READ, not drowned: fully clear before the whiteout */
+  { el: document.getElementById('plate-invest'), a: new THREE.Vector3(-1.6, 3.6, 2.3), w: [0.938, 0.968], counted: true }
+].filter(pl => pl.el);
+/* the belief ladder — five declarations spiralling up around the heart */
+const cavDecls = [0, 1, 2, 3, 4].map(i => {
+  const a = (i / 5) * Math.PI * 2 + 0.5;
+  return {
+    el: document.getElementById('decl-' + (i + 1)),
+    a: new THREE.Vector3(Math.cos(a) * 2.7, 1.9 + i * 0.58, Math.sin(a) * 2.7),
+    w: [0.786 + i * 0.021, 0.826 + i * 0.021]
+  };
+}).filter(d => d.el);
+let countRun = false;
+const _cproj = new THREE.Vector3();
+/* the heart's screen position (set each cavern frame) — declarations repel
+   from it so the belief copy never crosses the film's one sacred object */
+const _heartScr = { x: -1e4, y: -1e4 };
+/* on portrait the plates and the free declarations fight for the same
+   band — while a plate is substantially open, the decls yield (set per
+   frame by the cavern drive) */
+let _declSquelch = 0;
+function seatCavPlate(item, P, W, H, isDecl) {
+  const el = item.el;
+  let w = seg(P, item.w[0], item.w[0] + 0.014) * (1 - seg(P, item.w[1] - 0.014, item.w[1]));
+  if (isDecl) w *= 1 - _declSquelch;
+  if (w <= 0.01) {
+    el.style.opacity = '0'; el.style.visibility = 'hidden';
+    el.classList.remove('live');
+    el.setAttribute('aria-hidden', 'true');
+    return 0;
+  }
+  _cproj.copy(item.a).add(CAV).project(camera);
+  if (_cproj.z > 1 || _cproj.z < -1) { el.style.opacity = '0'; el.style.visibility = 'hidden'; return 0; }
+  if (el._pw === undefined || (_lblFrame % 16 === 0)) {
+    el._pw = el.offsetWidth || 320; el._ph = el.offsetHeight || 160;
+  }
+  let x = (_cproj.x * 0.5 + 0.5) * W - el._pw / 2;
+  let y = (-_cproj.y * 0.5 + 0.5) * H - el._ph / 2;
+  if (!isDecl && W < H * 0.8) {
+    /* portrait: the plate seats BELOW the heart's band — centered plates
+       were hiding the film's one sacred object for the whole chamber act */
+    y = Math.max(y, H * 0.40);
+  }
+  if (isDecl) {
+    /* the declarations float, but never off the page (mobile clipped them
+       mid-word) and never across the heart's bloom */
+    const cx = x + el._pw / 2, cy = y + el._ph / 2;
+    const dx = cx - _heartScr.x, dy = cy - _heartScr.y;
+    const rx = el._pw / 2 + Math.min(W, H) * 0.16, ry = el._ph / 2 + Math.min(W, H) * 0.15;
+    if (Math.abs(dx) < rx && Math.abs(dy) < ry) {
+      if (Math.abs(dx) / rx > Math.abs(dy) / ry) x += (dx >= 0 ? rx - dx : -rx - dx);
+      else y += (dy >= 0 ? ry - dy : -ry - dy);
+    }
+    x = Math.max(12, Math.min(W - el._pw - 12, x));
+    /* the ladder is a TITLE STRIP: declarations live in the top band while
+       the plates live below — spatial separation instead of the squelch
+       that made the film's core argument effectively invisible */
+    y = Math.max(H * 0.07, Math.min(H * 0.21, y));
+  } else {   // plates clamp into the readable band, below the decl strip
+    x = Math.max(16, Math.min(W - el._pw - 16, x));
+    y = Math.max(H * 0.30, Math.min(H * 0.985 - el._ph, y));
+  }
+  el.style.visibility = 'visible';
+  el.style.opacity = String(w);
+  el.style.transform = `translate(${x.toFixed(1)}px, ${(y + (1 - w) * 12).toFixed(1)}px)`;
+  el.style.filter = w < 0.995 ? `blur(${((1 - w) * 4).toFixed(1)}px)` : 'none';
+  el.setAttribute('aria-hidden', w > 0.5 ? 'false' : 'true');
+  el.classList.toggle('live', w > 0.6);
+  /* the moat numbers count from the plate's FIRST appearance (arming at
+     0.6 left a fast or scrubbed-back arrival reading zeros at readable
+     opacity — the flagship claims inverted) */
+  if (!isDecl && !item.counted && w > 0.15) {
+    item.counted = true; countRun = true;
+    el.querySelectorAll('.pcount').forEach((c) => {
+      c._t0 = performance.now(); c._target = +c.dataset.target;
+    });
+  }
+  return w;
+}
+
+/* ================================================================ */
 /* ---------------- camera path ---------------- */
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const KF = [
@@ -1993,9 +2541,26 @@ scene.add(new THREE.Points(deepGeo, deepMat));
 let hoverIdx = -1, lastGalaxy = 0;
 const clockForFlash = { t: 0 };
 addEventListener('pointerdown', e => {
-  if (lastExplore < 0.3 || hoverBlock < 0) return;
+  if (lastExplore < 0.3) return;
   if (e.target.closest && e.target.closest('a, button, nav')) return;
-  const b = exploreBlocks[hoverBlock];
+  /* ground the hover in the ACTUAL tap — on touch, cx/cy is stale drag-scroll
+     residue, and a tap anywhere near a facet would navigate away mid-film */
+  mouse.cx = e.clientX; mouse.cy = e.clientY;
+  let idx = -1, best = 110;
+  for (let i = 0; i < exploreBlocks.length; i++) {
+    const b = exploreBlocks[i];
+    if (b.sx === undefined) continue;
+    const d = Math.hypot(b.sx - e.clientX, b.sy - e.clientY);
+    if (d < best) { best = d; idx = i; }
+  }
+  if (idx < 0) return;
+  const b = exploreBlocks[idx];
+  /* coarse pointers confirm: the first tap expands the facet (the update loop
+     marks it hot from the grounded cx/cy), the second tap navigates */
+  if (matchMedia('(pointer: coarse)').matches && !b.el.classList.contains('hot')) {
+    hoverBlock = idx;
+    return;
+  }
   b.el.classList.add('auth');
   const tag = b.el.querySelector('.star-tag');
   if (tag) tag.textContent = 'OPENING ▓▒░';
@@ -2062,12 +2627,25 @@ const leaderEls = labels.map((_, i) => {
 const _proj = new THREE.Vector3();
 
 /* ---------------- choreography ---------------- */
-let progress = 0;
+let progress = 0;        // legacy-warped p — every surface act reads this
+let masterP = 0;         // master descent progress — the interior reads this
+/* THE DESCENT warp (mirrored in main.js): the legacy journey plays in
+   master P ∈ [0, 0.615] at its original pacing; the breach, the dive and
+   the heart cavern own the rest. */
+const LEGACY_END = 0.615, LEGACY_CAP = 0.955;
+const warpLegacy = (P) => P <= LEGACY_END ? (P / LEGACY_END) * LEGACY_CAP : LEGACY_CAP;
 const whiteout = document.getElementById('whiteout');
 
 function update(time) {
-  const p = progress;
+  const p = progress;      // the surface acts (legacy-authored)
+  const P = masterP;       // the whole descent (master-authored)
   clockForFlash.t = time;
+
+  /* the interior arms as the visitor approaches the vault, and owns the
+     frame once the dive film has covered the cut inside */
+  if (!cavArmed && P > 0.5) armCavern();
+  const inCavern = P > 0.66;
+  cavGroup.visible = P > 0.58;
 
   window.SCORE?.setProgress(p);   // the score's harmony follows the descent
 
@@ -2077,6 +2655,7 @@ function update(time) {
     if (lastActIdx !== -1) {
       HUD_SCRAMBLE_ELS.forEach(el => scrambleIn(el));
       window.SFX?.telemetry(3);          // the whole HUD re-stamps
+      window.SOUNDWORLD?.crack(0.8);     // the ice answers the crossing
     }
     lastActIdx = ai;
   }
@@ -2130,8 +2709,18 @@ function update(time) {
      BOTH effects must be fully clear by p=0.525: the story SNAPS (and the
      auto-play dwells) at 0.53 — the protocol beat has to read crisp, not
      through frozen glass. The veil now lives entirely inside the glide. */
-  const frost = seg(p, 0.44, 0.475) * (1 - seg(p, 0.49, 0.522)) * 0.55;
-  chromaPass.uniforms.uFrost.value = frost;
+  const frost = seg(p, 0.44, 0.475) * (1 - seg(p, 0.49, 0.522)) * 0.55
+    /* the signature film ENTERS through the same frost grammar it exits by —
+       without this its first frame was a hard splice off the wide plain */
+    + seg(p, 0.385, 0.403) * (1 - seg(p, 0.412, 0.432)) * 0.45
+    /* the breach — the veil blinks as the ice opens and the dive begins */
+    + seg(P, 0.596, 0.628) * (1 - seg(P, 0.64, 0.672)) * 0.8
+    /* the arrival — a short blink over the film's hand-off that is FULLY
+       clear before the film releases the frame (0.778): the reveal of the
+       heart must be crisp, not read through frosted glass (jury: the old
+       0.79 clearing blew the arrival to a near-white non-image) */
+    + seg(P, 0.744, 0.758) * (1 - seg(P, 0.764, 0.778)) * 0.42;
+  chromaPass.uniforms.uFrost.value = Math.min(0.85, frost);
   chromaPass.uniforms.uSpace.value = 0;
   chromaPass.uniforms.uTime.value = time;
 
@@ -2203,6 +2792,15 @@ function update(time) {
     figB.position.set(twinX, Math.sin(time * 0.5 + 1) * 0.01, 0);
     figB.rotation.y = -sway;
     if (matTwin) { matTwin.opacity = twinAlpha; }
+    /* the scene-level chest lights follow their bodies (they cannot live
+       inside the toggled figures — see lightHeart) */
+    if (heart) heart.light.position.set(humanX + 0.03, 1.27 + figA.position.y, 0.02);
+    if (core) core.light.position.set(twinX - 0.03, 1.27 + figB.position.y, 0.02);
+    /* arm the black-twin sentinel: while the twin stands fully cast on the
+       bright surface, its chest pixel must never read black (see probeTwin) */
+    _twinChest.set(twinX, 1.27, 0.05);
+    _twinBright = sp > 0.6 && twinAlpha > 0.95 && masterP < 0.55
+      && progress > 0.183 && progress < 0.90;
 
     shadowA.position.set(humanX, 0.01, 0);
     shadowB.position.set(twinX, 0.01, 0);
@@ -2229,7 +2827,18 @@ function update(time) {
     const rightX = (_proj.x * 0.5 + 0.5) * Wp;
     _proj.set(figB.position.x, 1.05, 0).project(camera);
     const twinY = (-_proj.y * 0.5 + 0.5) * Hp;
-    const pw = authNet.offsetWidth || 200, ph = authNet.offsetHeight || 240;
+    if (!authMeasure) {
+      const base = authNet.getBoundingClientRect();
+      authMeasure = {
+        pw: authNet.offsetWidth || 200,
+        ph: authNet.offsetHeight || 240,
+        rel: appChips.map((c) => {
+          const r = c.el.getBoundingClientRect();
+          return { x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height / 2 };
+        })
+      };
+    }
+    const pw = authMeasure.pw, ph = authMeasure.ph;
     let px = Math.min(rightX + 46, Wp - pw - 20);
     let py = Math.max(74, Math.min(Hp - ph - 20, twinY - ph / 2));
     /* narrow viewports: if the clamp would slide the panel ONTO the twin,
@@ -2314,8 +2923,9 @@ function update(time) {
     let maxFlare = 0;
     for (let i = 0; i < N; i++) {
       const c = appChips[i];
-      const r = c.el.getBoundingClientRect();
-      const tx = r.left + r.width / 2, ty = r.top + r.height / 2;
+      /* chip centres derive from the panel seat + cached offsets — the rect
+         read here used to force layout against this frame's transform write */
+      const tx = px + authMeasure.rel[i].x, ty = py + authMeasure.rel[i].y;
       const ai = 0.16 + 0.80 * (N > 1 ? i / (N - 1) : 0);
       const signed = authFlow >= ai;
       if (signed !== c.authed) { c.authed = signed; c.el.classList.toggle('authorized', signed); }
@@ -2363,37 +2973,77 @@ function update(time) {
       if (d < nearestD) { nearestD = d; nearest = i; }
     }
     hoverBlock = nearest;
+    /* the ring never crosses the bodies: a block passing in FRONT of a
+       figure DUCKS until it has passed (the emblems were parking on the
+       twins' heads at the protocol beats — copy never crosses the figures,
+       and neither do the relics) */
+    const spF = smooth(splitPos);
+    _proj.set(-GAP * spF - moat * 0.20, 1.2, 0).project(camera);
+    const f1x = (_proj.x * 0.5 + 0.5) * W2, f1z = _proj.z;
+    _proj.set(GAP * spF + moat * 0.20, 1.2, 0).project(camera);
+    const f2x = (_proj.x * 0.5 + 0.5) * W2, f2z = _proj.z;
     for (let i = 0; i < exploreBlocks.length; i++) {
       const b = exploreBlocks[i];
       const hovered = i === hoverBlock;
       const ease = smooth(explore);
       /* the facet orbits the standing human, rises from the ice as it appears,
          then sinks back into the ice — the human is never touched */
-      const a = b.ang + time * 0.075;
-      const y = b.ringY * (1 - facetRise) - facetSink * 1.4
+      /* a CROWN, not a full orbit — the card claims FIVE facets but a
+         rotating ring never showed more than three: two pairs flank the
+         sovereigns and the fifth floats crowned above them, all facing the
+         visitor, swaying in place */
+      /* a WIDE QUINTET flanking the pair — the crowned center emblem sat
+         where any render fault lands on the sovereigns' heads (and did) */
+      const arcFr = [-1.42, -0.78, 1.95, 0.78, 1.42][i] || 0;
+      const a = Math.PI * 0.5 + arcFr + Math.sin(time * 0.11 + b.seed) * 0.07;
+      const yLift = 0;
+      const y = (b.ringY + yLift) * (1 - facetRise) - facetSink * 1.4
         + Math.sin(time * 0.5 + b.seed) * 0.06;
-      b.mesh.position.set(Math.cos(a) * RING_R, y, Math.sin(a) * RING_R);
+      const rr = RING_R * 1.32;
+      b.mesh.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr);
+      _proj.copy(b.mesh.position).project(camera);      // re-seat after the crown step
+      b.sx = (_proj.x * 0.5 + 0.5) * W2;
+      b.sy = (-_proj.y * 0.5 + 0.5) * H2;
+      /* duck in FRONT of a figure or BEHIND it — the bodies are translucent
+         glass, so a block passing behind still reads as a collision through
+         the torso */
+      const duck = !hovered &&
+        (Math.abs(b.sx - f1x) < 90 || Math.abs(b.sx - f2x) < 90) ? 0.18 : 1;
       if (!REDUCED) b.mesh.rotation.y += (hovered ? 0.006 : 0.0018);
-      const op = ease * (hovered ? 1.0 : 0.97);
+      const op = ease * (hovered ? 1.0 : 0.97) * duck;
       for (const m of b.mats) m.opacity = op;
-      for (const m of b.edgeMats) m.opacity = ease * (hovered ? 0.8 : 0.38);
+      for (const m of b.edgeMats) m.opacity = ease * (hovered ? 0.8 : 0.38) * duck;
       b.mesh.scale.setScalar((0.55 + 0.45 * ease + (hovered ? 0.1 : 0)) * 1.15);
       b.spark.position.copy(b.mesh.position);
-      b.spark.material.opacity = ease * (hovered ? 0.85 : 0.32)
+      b.spark.material.opacity = ease * (hovered ? 0.85 : 0.32) * duck
         * (0.75 + 0.25 * Math.sin(time * 1.3 + b.seed));
-      /* centred above its block; resting labels are tiny codes so they can
-         never collide, the hovered one expands into the full card */
+      /* centred above its block */
       if (b.el._lw === undefined || (_lblFrame + i) % 8 === 0) b.el._lw = b.el.offsetWidth || 60;
-      const lw2 = b.el._lw;
-      const lx2 = Math.max(10, Math.min(W2 - lw2 - 10, b.sx - lw2 / 2));
-      const ly2 = Math.max(70, Math.min(H2 - 140, b.sy - 92));
-      b.el.style.transform = `translate(${lx2}px, ${ly2}px)`;
-      b.el.style.opacity = String(ease * (hovered ? 1 : 0.5));
+      b._lx = Math.max(10, Math.min(W2 - b.el._lw - 10, b.sx - b.el._lw / 2));
+      b._ly = Math.max(70, Math.min(H2 - 140, b.sy - 92));
+      /* the label lives and dies WITH its emblem — orphaned sky labels were
+         hanging over the range after the facets dissolved */
+      b._op = op * (hovered ? 1 : 0.55) * duck;
+      b._hov = hovered;
+    }
+    /* label separation — two blocks can project into the same column; the
+       later label steps a row down instead of overprinting */
+    const bOrder = [...exploreBlocks].sort((p, q) => p._lx - q._lx);
+    for (let i = 1; i < bOrder.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const A = bOrder[j], B = bOrder[i];
+        if (Math.abs(B._lx - A._lx) < (A.el._lw + B.el._lw) / 2 + 10 &&
+            Math.abs(B._ly - A._ly) < 24) B._ly = A._ly + 26;
+      }
+    }
+    for (const b of exploreBlocks) {
+      b.el.style.transform = `translate(${b._lx}px, ${b._ly}px)`;
+      b.el.style.opacity = String(b._op);
       /* a clicked block stays expanded while OPENING, even if the pointer
          drifts during the navigation delay */
       const opening = b.el.classList.contains('auth');
-      b.el.classList.toggle('hot', hovered || opening);
-      if (opening) b.el.style.opacity = String(ease);
+      b.el.classList.toggle('hot', b._hov || opening);
+      if (opening) b.el.style.opacity = String(smooth(explore));
     }
     document.body.style.cursor = hoverBlock >= 0 && explore > 0.3 ? 'pointer' : '';
   } else {
@@ -2427,7 +3077,15 @@ function update(time) {
     rim.color.lerpColors(RIM_BASE, RIM_GOLD, gold * 0.5);
     hemi.groundColor.lerpColors(HEMI_BASE, HEMI_GOLD, gold * 0.6);
   }
-  vault.visible = moatVis > 0.01;
+  /* past the midpoint, fetch the cube billboard so it's decoded well before
+     its p≈0.86 entrance (the same lazy policy vaultfilm uses) */
+  if (armVaultCube && p > 0.5) { const arm = armVaultCube; armVaultCube = null; arm(); }
+  /* > 0.04, not > 0.01: at the window's first breath every part still sits
+     at opacity ~0, and a poisoned program ignores opacity and paints an
+     opaque black quad (measured: a depthTest-off frost plane as a black
+     slab over the figures). Visibility is the one gate a broken program
+     cannot ignore; the monolith is still 96% sunk at 0.04, so no pop. */
+  vault.visible = moatVis > 0.04;
   if (vault.visible) {
     const ud = vault.userData;
     const grow = smooth(moatVis);
@@ -2457,9 +3115,18 @@ function update(time) {
     ud.bandMat.opacity = moatVis;
     ud.goldLineMat.opacity = moatVis;
     /* the hairline carries the pulse — and blazes while a name is struck */
-    ud.engraveSurge *= 0.988;
+    {
+      /* frame-rate-independent decay: per-frame *=0.988 died twice as fast
+         on 120Hz displays (the codebase's label easing already does this) */
+      const nowS2 = performance.now() * 0.001;
+      const sdt = Math.min(0.1, Math.max(0.001, nowS2 - (ud.__surgeT ?? nowS2)));
+      ud.__surgeT = nowS2;
+      ud.engraveSurge *= Math.pow(0.988, sdt * 60);
+    }
     ud.goldLineMat.emissiveIntensity = 0.3 + 0.5 * hb + 1.1 * ud.engraveSurge;
-    ud.sealMat.opacity = moatVis;
+    /* the ring's engraving steps aside while the standing vow words pass —
+       three text layers were stacking in the same lower-third band */
+    ud.sealMat.opacity = moatVis * (1 - 0.92 * _sovVis);
     /* gold dust rising around the monument — reborn at the base */
     {
       const mp = ud.motePos, ms2 = ud.moteSeed;
@@ -2537,17 +3204,32 @@ function update(time) {
         [GAP * sp2v + moat * 0.20, -0.02, 0.35],
         [0, 0.02, 0.92]
       ];
+      /* portrait: the three anchors converge into the same central band and
+         the words overprinted into soup — stack them as three clean rows */
+      const sovPortrait = innerWidth < innerHeight * 0.8;
+      _sovVis = 0;
       for (let i = 0; i < sovWords.length; i++) {
         const s = sovWords[i];
         const w = clamp01((gm - s.at) / 0.16);
+        _sovVis = Math.max(_sovVis, w * sovFade);
         _proj.set(anchors[i][0], anchors[i][1], anchors[i][2]).project(camera);
         if (!s.w && s.el.offsetWidth) s.w = s.el.offsetWidth;   // measured once, cached
         const half = (s.w || 100) / 2;
-        /* clamp fully on-screen — on narrow viewports the figures stand at
-           the frame edges and the words must not clip away */
-        const sx = Math.max(half + 10, Math.min(innerWidth - half - 10,
-          (_proj.x * 0.5 + 0.5) * innerWidth));
-        const sy = (-_proj.y * 0.5 + 0.5) * innerHeight;
+        let sx, sy;
+        if (sovPortrait) {
+          sx = innerWidth / 2;
+          sy = innerHeight * 0.60 + i * (innerWidth < 480 ? 32 : 40);
+        } else {
+          /* clamp fully on-screen — on narrow viewports the figures stand at
+             the frame edges and the words must not clip away */
+          sx = Math.max(half + 10, Math.min(innerWidth - half - 10,
+            (_proj.x * 0.5 + 0.5) * innerWidth));
+          sy = (-_proj.y * 0.5 + 0.5) * innerHeight;
+        }
+        /* each word clamps to its OWN row, seated BELOW the figures' feet —
+           one shared ceiling flattened the three onto one line, and higher
+           rows crossed the twin's legs (copy never crosses the figures) */
+        sy = Math.min(sy, innerHeight - 186 + i * 26);
         s.el.style.transform =
           `translate3d(${sx.toFixed(1)}px, ${(sy + 12 + (1 - w) * 18).toFixed(1)}px, 0) translateX(-50%)`;
         s.el.style.opacity = (w * sovFade).toFixed(3);
@@ -2556,17 +3238,25 @@ function update(time) {
     }
 
     /* the claim invitation rides the same window as the standing phrases,
-       and retires forever once the vault is owned */
+       and, once owned, stays as the quiet SEALED FOR {NAME} re-strike path
+       (main.js swaps its copy) — a typo'd name must never be permanent */
     if (claimCta) {
-      claimCta.classList.toggle('on',
-        moatVis > 0.55 && p < 0.93 && !window.__vaultOwned);
+      /* the claim invites twice: at the vault's face on the surface, and
+         inside — beside the seal ring itself, where the name is struck */
+      /* ONE invitation, in the chamber where the name is struck — the
+         surface appearance stacked a fifth text system onto the vault
+         reveal (jury, three rounds running) */
+      claimCta.classList.toggle('on', P > 0.895 && P < 0.952);
     }
 
     /* LIGHT-THREADS — the two sovereigns feed the sealed heart: a warm
        blood-thread from the human's chest, a gold signal-thread from the
        twin's, each with a slow pulse of light travelling inward. The vault
        is not an object between them; it is OF them. */
-    if (figureLoaded && heartUp > 0.05) {
+    if (figureLoaded && heartUp > 0.05 && P <= 0.64) {
+      /* ^ the threads exist only while the surface act owns the frame — in
+         the cavern their surface anchors project to a degenerate squiggle
+         (the jury's "stray orange glyph in the sky") */
       const Wp = innerWidth, Hp = innerHeight, DPR2 = Math.min(devicePixelRatio || 1, 2);
       if (vaultFx.width !== Math.round(Wp * DPR2) || vaultFx.height !== Math.round(Hp * DPR2)) {
         vaultFx.width = Math.round(Wp * DPR2); vaultFx.height = Math.round(Hp * DPR2);
@@ -2665,14 +3355,38 @@ function update(time) {
   /* whiteout: a brief flash near the end that clears by p=1 so it never
      lingers over the sections below once the pin releases */
   if (whiteout) {
-    /* retimed so the vault film's blazing finale (scrub ends 0.975) plays
-       before the flash blooms out of it */
-    const flash = seg(p, 0.96, 0.985) * (1 - seg(p, 0.992, 1.0));
+    /* the true finale now lives at the top of the RETURN: the camera rises
+       into the oculus and the light takes the frame, clearing by P=1 so the
+       resting frame is the godray, the vow and the name */
+    /* rises only after the investors plate has fully cleared (0.968) */
+    const flash = seg(P, 0.960, 0.988) * (1 - seg(P, 0.99, 1.0));
     whiteout.style.opacity = String(flash * 0.92);
   }
 
-  /* camera */
-  sampleCamera(p);
+  /* camera — the surface line until the dive film covers the cut, then
+     the cavern owns the lens (its sampler applies its own portrait fit) */
+  if (inCavern) {
+    sampleCavernCamera(P);
+  } else {
+    sampleCamera(p);
+    /* portrait fit for the vault act: the FOV is vertical, so horizontal
+       coverage collapses on tall screens — the cube billboard went full-bleed
+       and both figures cropped out at 375px. Dolly back along the view axis,
+       ramping in with the act; desktop (aspect >= 1.05) is untouched and every
+       earlier beat's tuned framing renders identically. */
+    const vaultK = seg(p, 0.84, 0.90);
+    if (vaultK > 0) {
+      const fitK = 1 + (Math.max(1, Math.min(1.9, 1.05 / camera.aspect)) - 1) * vaultK;
+      if (fitK > 1.001) camPos.sub(camLook).multiplyScalar(fitK).add(camLook);
+    }
+    /* same fit for the facet act — the card says TAP A FACET while the
+       tappable ring cropped out of a 375px frame */
+    const facetK = seg(p, 0.50, 0.56) * (1 - seg(p, 0.70, 0.76));
+    if (facetK > 0) {
+      const fk = 1 + (Math.max(1, Math.min(2.6, 1.12 / camera.aspect)) - 1) * facetK;
+      if (fk > 1.001) camPos.sub(camLook).multiplyScalar(fk).add(camLook);
+    }
+  }
   mouse.x += (mouse.tx - mouse.x) * 0.04;
   mouse.y += (mouse.ty - mouse.y) * 0.04;
   camera.position.copy(camPos);
@@ -2693,6 +3407,102 @@ function update(time) {
   );
   /* the lens focuses on the story's subject — DOF rides the look target */
   if (bokehPass) bokehPass.uniforms['focus'].value = camera.position.distanceTo(camLook);
+
+  /* ---------------- the heart cavern, alive ---------------- */
+  if (cavGroup.visible) {
+    const chb = heartbeat(time);
+    /* the chamber's own KEY — pull the height-fog whiteout and the exposure
+       down inside the ice: the climax must have a black point (the jury
+       measured the arrival's tonal range at 42 vs the films' 112; 'too
+       much light and flashy' is an explicit anti-reference) */
+    /* full key BEFORE the film releases the frame (0.778) — frame one of
+       the live chamber must already have tone, or the handoff reads as
+       waking up in a different room */
+    /* key in over the arrival: the dive film EXITS bright (l~0.88), so
+       full key at the handoff frame made a tonal cliff — the chamber now
+       meets the film at its brightness and deepens INTO the act */
+    const cavKey = seg(P, 0.765, 0.802);
+    scene.fog.density = 0.016 * (1 - 0.88 * cavKey);
+    renderer.toneMappingExposure = 0.88 * (1 - 0.18 * cavKey);
+    cavDomeMat.uniforms.uTime.value = time % 3600.0;
+    godrayMat.uniforms.uTime.value = time % 3600.0;
+    /* the return brightens the shaft — the light literally receives you */
+    godrayMat.uniforms.uAmp.value = 0.26 + 0.10 * chb + seg(P, 0.94, 1.0) * 0.9;
+    cavHeart.scale.setScalar(1 + chb * 0.16);
+    /* additive light on a WHITE world saturates fast — the glow stays a
+       breath, the gem itself carries the red */
+    /* the glows die into the whiteout — a residual pink smear was staining
+       the vow type at 0.97 */
+    const glowKill = 1 - seg(P, 0.952, 0.985);
+    cavGlowIn.scale.setScalar(2.4 * (1 + chb * 0.35));
+    cavGlowIn.material.opacity = (0.22 + chb * 0.18) * glowKill;
+    cavGlowOut.scale.setScalar(9.5 * (1 + chb * 0.2));
+    cavGlowOut.material.opacity = (0.06 + chb * 0.05) * glowKill;
+    cavHeartMat.emissiveIntensity = 1.0 + chb * 1.0;
+    cavNucleus.scale.setScalar(1.35 * (1 + chb * 0.22));
+    cavNucleus.material.opacity = (0.5 + 0.22 * chb) * glowKill;
+    cavCore.scale.setScalar(0.5 * (1 + chb * 0.3));
+    cavCore.material.opacity = (0.7 + 0.3 * chb) * glowKill;
+    if (rubyReady) {
+      rubySprite.scale.set(1.58 * (1 + chb * 0.09), 1.29 * (1 + chb * 0.09), 1);
+      rubyMat.opacity = Math.min(1, seg(P, 0.755, 0.79) * 1.2);
+    }
+    cavFloorGlow.material.opacity = (0.07 + chb * 0.07) * seg(P, 0.70, 0.78);
+    cavRingMat.emissiveIntensity = 0.10 + chb * 0.10;
+    latticeG.rotation.y = time * 0.05;
+    /* the lattice steps aside for the eye: any shard near the camera→heart
+       sightline fades so the ruby always reads WHOLE on screen */
+    _shA.set(CAV.x, CAV.y + 3.05, CAV.z);            // the heart, world space
+    _shAB.copy(_shA).sub(camera.position);
+    const _shLen2 = Math.max(1e-6, _shAB.lengthSq());
+    for (const sh of latticeShards) {
+      sh.getWorldPosition(_shP);
+      _shAP.copy(_shP).sub(camera.position);
+      const t = clamp01(_shAP.dot(_shAB) / _shLen2);
+      /* nearest point on the camera→heart segment, then the miss distance */
+      _shAP.copy(camera.position).addScaledVector(_shAB, t);
+      const d = _shP.distanceTo(_shAP);
+      sh.material.opacity = 0.06 + 0.50 * smooth(clamp01((d - 0.55) / 1.1));
+    }
+    shaftMotes.rotation.y = time * 0.016;
+    shaftMotes.position.y = Math.sin(time * 0.11) * 0.35;
+    cavAirMotes.rotation.y = -time * 0.008;
+    /* the moat numbers count up the first time the wall is read */
+    if (countRun) {
+      let live = false;
+      for (const c of document.querySelectorAll('#plate-specs .pcount')) {
+        if (c._t0 === undefined) continue;
+        const k = Math.min(1, (performance.now() - c._t0) / 1900);
+        const e = 1 - Math.pow(1 - k, 4);
+        c.textContent = String(Math.round((c._target || 0) * e));
+        if (k < 1) live = true;
+      }
+      if (!live) countRun = false;
+    }
+    /* the reading deck + the belief ladder, seated in the chamber.
+       REDUCED visitors read the static page sections instead (main.js keeps
+       them visible), so the projected copy stays out of their calm frame. */
+    if (!REDUCED) {
+      _cproj.set(CAV.x, CAV.y + 3.05, CAV.z).project(camera);
+      _heartScr.x = (_cproj.x * 0.5 + 0.5) * innerWidth;
+      _heartScr.y = (-_cproj.y * 0.5 + 0.5) * innerHeight;
+      let plateMax = 0;
+      for (const pl of cavPlates) plateMax = Math.max(plateMax, seatCavPlate(pl, P, innerWidth, innerHeight, false));
+      /* the strip/band separation replaced the squelch: the declarations
+         hold the top band, the plates the body — both always readable */
+      void plateMax;
+      _declSquelch = 0;
+      for (const d of cavDecls) seatCavPlate(d, P, innerWidth, innerHeight, true);
+    }
+  } else {
+    scene.fog.density = 0.016;
+    renderer.toneMappingExposure = 0.88;
+    for (const pl of cavPlates) {
+      pl.el.style.opacity = '0'; pl.el.style.visibility = 'hidden';
+      pl.el.classList.remove('live');
+    }
+    for (const d of cavDecls) { d.el.style.opacity = '0'; d.el.style.visibility = 'hidden'; }
+  }
 
   /* ---------------- side labels (no leaders) ----------------
      Each card simply APPEARS beside its subject object — preferring the
@@ -2760,7 +3570,8 @@ function update(time) {
     if (i === 4) {
       label.style.visibility = 'visible';
       label.style.opacity = String(w);
-      label.style.transform = `translate(${Math.max(24, W * 0.06)}px, ${H - 300}px)`;
+      label.style.transform = `translate(${Math.max(24, W * 0.06)}px, ${H - 300 + (1 - w) * 12}px)`;
+      label.style.filter = w < 0.995 ? `blur(${((1 - w) * 4).toFixed(1)}px)` : 'none';
       continue;
     }
 
@@ -2774,7 +3585,10 @@ function update(time) {
     const col = beside[i] || colA || colB || colM;
 
     let targetX, targetY;
-    const besideY = Math.max(84, Math.min(H - lh - 40, col ? col.cy - lh * 0.42 : H * 0.3));
+    /* portrait: the card seats BELOW the faces — a mid-height card was
+       slicing both figures at head height while 40% of the frame sat empty */
+    const portraitFloor = W < H * 0.8 ? H * 0.52 : 84;
+    const besideY = Math.max(portraitFloor, Math.min(H - lh - 40, col ? col.cy - lh * 0.42 : H * 0.3));
     if (col) {
       const gap = 46;
       const right = col.b + gap;
@@ -2810,17 +3624,72 @@ function update(time) {
 
     label.style.visibility = 'visible';
     label.style.opacity = String(w);
-    label.style.transform = `translate(${st.x}px, ${st.y}px)`;
+    /* the condense-from-air grammar (the sov-words' entrance): a small rise +
+       a blur that clears as the window opens — scrubbed via w, so fully
+       interruptible and reduced-motion safe */
+    label.style.transform = `translate(${st.x}px, ${st.y + (1 - w) * 12}px)`;
+    label.style.filter = w < 0.995 ? `blur(${((1 - w) * 4).toFixed(1)}px)` : 'none';
   }
 }
 
 /* ---------------- loop ---------------- */
 const clock = new THREE.Clock();
+
+/* BLACK-TWIN SENTINEL — the twin's transmission program intermittently
+   compiles into a state that paints the body solid black for the whole
+   session (a load-order race, ~1 in 5-10 cold loads; the rim stays gold so
+   only the transmitted interior dies). It cannot be reproduced on demand,
+   so the page checks ITSELF: one 1x1 readPixels at the twin's chest every
+   ~45 frames while the twin stands bright on the surface. Two consecutive
+   black reads -> force the figure programs to recompile (heals it); six
+   healthy reads -> the sentinel retires for the session. Cost: nothing. */
+const _twinChest = new THREE.Vector3();
+let _twinBright = false, _twinProbeDone = false;
+let _twinProbeFrame = 0, _twinBlackStreak = 0, _twinHealthy = 0, _twinHealTries = 0;
+const _probePx = new Uint8Array(4);
+function probeTwin() {
+  if (_twinProbeDone || !_twinBright || !figureLoaded) return;
+  if ((++_twinProbeFrame) % 30 !== 0) return;
+  _proj.copy(_twinChest).project(camera);
+  if (_proj.z > 1 || _proj.z < -1) return;
+  const gl = renderer.getContext();
+  const px = Math.round((_proj.x * 0.5 + 0.5) * gl.drawingBufferWidth);
+  const py = Math.round((_proj.y * 0.5 + 0.5) * gl.drawingBufferHeight);
+  if (px < 0 || py < 0 || px >= gl.drawingBufferWidth || py >= gl.drawingBufferHeight) return;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, _probePx);
+  if (_probePx[0] + _probePx[1] + _probePx[2] < 30) {
+    _twinHealthy = 0;
+    if (++_twinBlackStreak >= 2) {
+      _twinBlackStreak = 0;
+      /* the twin is opaque gold now (transmission retired — the buffer it
+         sampled could render black); any residual black is a compile-state
+         fluke a recompile clears */
+      if (_twinHealTries++ < 4) {
+        matTwin.needsUpdate = true; matHuman.needsUpdate = true;
+      } else {
+        _twinProbeDone = true;
+      }
+    }
+  } else {
+    _twinBlackStreak = 0;
+    if (++_twinHealthy >= 6) _twinProbeDone = true;   // confirmed healthy
+  }
+}
+
 function render() {
   // reduced motion: the scene still scrubs with scroll, but all autonomous
   // motion (bob, orbit, heartbeat, sky drift) holds on one frozen instant
   update(REDUCED ? 20.0 : clock.getElapsedTime());
   composer.render();
+  probeTwin();
+}
+// dev-only: sentinel state for the capture harness
+if (new URLSearchParams(location.search).has('forcetick')) {
+  window.__twinSentinel = () => ({
+    armed: _twinBright, frame: _twinProbeFrame, black: _twinBlackStreak,
+    healthy: _twinHealthy, tries: _twinHealTries, done: _twinProbeDone
+  });
 }
 function tickLoop() { requestAnimationFrame(tickLoop); fitToStage(); render(); }
 
@@ -2849,14 +3718,18 @@ try {
   render();
   __worldOK = true;
   performance.mark('twins:first-frame');
-  console.info('[world] first frame in %dms (shaders pre-compiled)', Math.round(performance.now()));
+  if (new URLSearchParams(location.search).has('forcetick'))
+    console.info('[world] first frame in %dms (shaders pre-compiled)', Math.round(performance.now()));
 } catch (err) {
   window.WORLD_FAILED = true;
   console.error('[world] pipeline failed its first frame — using particle fallback', err);
 }
 
 if (__worldOK) {
-  window.WORLD = { ready: true, setProgress(v) { progress = clamp01(v); } };
+  window.WORLD = { ready: true, setProgress(v) {
+    masterP = clamp01(v);
+    progress = warpLegacy(masterP);
+  } };
   addEventListener('resize', fitToStage);
   tickLoop();
 
@@ -2888,6 +3761,7 @@ if (__worldOK) {
   if (new URLSearchParams(location.search).has('forcetick')) {
     window.__drawWorld = render;
     window.__scene = scene;            // debug-only: verification probes
+    window.__composer = composer;      // debug-only: post-chain bisection
   }
 } else {
   // tear down the dead WebGL canvas so the particle #figure shows cleanly

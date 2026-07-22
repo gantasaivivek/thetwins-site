@@ -149,12 +149,16 @@
     if (!targetSets[key]) return;
     a.addEventListener('mouseenter', () => { mode = key; });
     a.addEventListener('mouseleave', () => { mode = null; });
+    a.addEventListener('focus', () => { mode = key; });   /* the relic moment belongs to keyboards too */
+    a.addEventListener('blur', () => { mode = null; });
   });
   document.querySelectorAll('#footer a[data-link]').forEach(a => {
     const key = a.dataset.link;
     if (!targetSets[key]) return;
     a.addEventListener('mouseenter', () => { mode = key; });
     a.addEventListener('mouseleave', () => { mode = null; });
+    a.addEventListener('focus', () => { mode = key; });
+    a.addEventListener('blur', () => { mode = null; });
   });
 
   let t0 = performance.now();
@@ -175,6 +179,9 @@
       if (mode && glow < 0.5) { glow = 1; window.SFX?.telemetry?.(); }
       else if (mode) glow = 1;
       lastMode = mode;
+      /* reduced motion: dt is 0 so the decay below can never run — a surge
+         would stick at full flash forever. The frozen field stays quiet. */
+      if (REDUCED) glow = 0;
     }
     glow *= Math.pow(0.955, dt);
 

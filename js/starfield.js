@@ -50,6 +50,10 @@
   let t0 = performance.now();
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(now) {
+    /* the opaque WebGL film fully covers this canvas for the entire pinned
+       journey — skip ALL painting there (~25% of a mobile GPU frame saved);
+       painting resumes the instant the pin releases into the reading deck */
+    if (window.__filmPinned) { t0 = now; requestAnimationFrame(frame); return; }
     // reduced motion: sky still responds to scroll, drift/twinkle freeze
     const dt = REDUCED ? 0 : Math.min((now - t0) / 16.7, 3);
     t0 = now;

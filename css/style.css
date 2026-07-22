@@ -42,10 +42,12 @@
      as hairlines, marks and interpuncts, never as fills */
   --gold: #a5741f;
   --gold-bright: #c9974a;
+  --gold-ink: #8a6014;          /* gold TEXT on light glass — AA-safe */
   --gold-glow: rgba(201, 151, 74, 0.55);
   /* motion tokens — strong curves for entrances/landings; built-in `ease`
      deliberately stays for hover/colour changes */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19); /* exits: settle-in, ~60-70% of the enter */
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-spring: cubic-bezier(0.2, 1.4, 0.3, 1);   /* the vow's landing curve */
   --sky-glow: #b5d5ff;
@@ -83,7 +85,7 @@ a { color: inherit; text-decoration: none; }
 
 /* keyboard path: a visible ≥2px focus ring on everything interactive
    (hover-only affordances are invisible to keyboard users) */
-a:focus-visible, button:focus-visible {
+a:focus-visible, button:focus-visible, input:focus-visible {
   outline: 2px solid var(--slate-dark);
   outline-offset: 3px;
   border-radius: 2px;
@@ -228,9 +230,24 @@ a:focus-visible, button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 22px clamp(20px, 4vw, 48px);
+  /* safe-area: on notch phones the bar must clear the status hardware */
+  padding: calc(22px + env(safe-area-inset-top, 0px)) clamp(20px, 4vw, 48px) 22px;
   color: var(--hud-color);
+  /* the ice-halo the HUD wears, with a hard bright core — the corners cross
+     the DARKEST peaks and the cavern wall, where bare slate dropped under 2:1 */
+  text-shadow: 0 0 3px rgba(240, 245, 251, 1), 0 1px 16px rgba(238, 243, 250, 0.95),
+               0 0 30px rgba(238, 243, 250, 0.7);
   opacity: 0;
+}
+#topbar::before {
+  /* an ice-light scrim behind the chrome — the wordmark and CONTACT cross
+     the darkest peaks, where no halo alone can guarantee AA */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(238, 243, 250, 0.72), rgba(238, 243, 250, 0));
+  pointer-events: none;
+  z-index: -1;
 }
 #topbar::after {
   content: '';
@@ -239,7 +256,7 @@ a:focus-visible, button:focus-visible {
   height: 1px;
   background: var(--hairline);
   transform: scaleX(0);
-  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.8s var(--ease-out);
 }
 #topbar.scrolled::after { transform: scaleX(1); }
 .wordmark-star {
@@ -257,7 +274,7 @@ a:focus-visible, button:focus-visible {
   vertical-align: 0.06em;
 }
 .topnav { display: flex; gap: clamp(18px, 3vw, 40px); }
-.topnav a, .footer-links a {
+.topnav a, .footer-links a, .footer-col a {
   position: relative;
   opacity: 0.75;
   transition: opacity 0.3s ease;
@@ -268,9 +285,12 @@ a:focus-visible, button:focus-visible {
   content: '';
   position: absolute;
   left: -8px; right: -8px;
-  top: -14px; bottom: -14px;
+  top: -16px; bottom: -16px;
 }
-.topnav a::after, .footer-links a::after {
+/* rapid re-taps (toggles, links) must never trigger iOS smart-zoom — the
+   pinned film suddenly zooming reads as a catastrophic glitch */
+.hud-sound, .topnav a, .footer-col a, .footer-links a, .social { touch-action: manipulation; }
+.topnav a::after, .footer-links a::after, .footer-col a::after {
   content: '';
   position: absolute;
   left: 0; bottom: -4px;
@@ -278,11 +298,11 @@ a:focus-visible, button:focus-visible {
   background: var(--gold-bright);
   transform: scaleX(0);
   transform-origin: right;
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s var(--ease-out);
 }
-.topnav a:hover, .footer-links a:hover { opacity: 1; }
+.topnav a:hover, .footer-links a:hover, .footer-col a:hover { opacity: 1; }
 @media (hover: hover) and (pointer: fine) {
-  .topnav a:hover::after, .footer-links a:hover::after {
+  .topnav a:hover::after, .footer-links a:hover::after, .footer-col a:hover::after {
     transform: scaleX(1);
     transform-origin: left;
   }
@@ -356,8 +376,9 @@ a:focus-visible, button:focus-visible {
   text-align: center;
   font-size: clamp(14px, 1.8vw, 18px);
   letter-spacing: 0.06em;
-  opacity: 0.92;
-  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.9), 0 0 6px rgba(238, 243, 250, 0.65);
+  color: #383e47;
+  opacity: 1;
+  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.95), 0 0 6px rgba(238, 243, 250, 0.8);
 }
 .hero-line {
   position: absolute;
@@ -370,8 +391,9 @@ a:focus-visible, button:focus-visible {
   font-weight: 500;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  opacity: 0.8;
-  text-shadow: 0 1px 14px rgba(238, 243, 250, 0.9), 0 0 5px rgba(238, 243, 250, 0.6);
+  color: #383e47;
+  opacity: 0.95;
+  text-shadow: 0 1px 14px rgba(238, 243, 250, 0.95), 0 0 5px rgba(238, 243, 250, 0.8);
 }
 /* gold interpuncts carry the vow's beat wherever the line appears */
 .gsep {
@@ -386,6 +408,8 @@ a:focus-visible, button:focus-visible {
   left: 50%;
   bottom: 34px;
   transform: translateX(-50%);
+  color: #383e47;
+  text-shadow: 0 1px 12px rgba(238, 243, 250, 0.95), 0 0 4px rgba(238, 243, 250, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -428,10 +452,12 @@ a:focus-visible, button:focus-visible {
   box-shadow: 0 18px 44px rgba(35, 38, 44, 0.10), 0 2px 8px rgba(35, 38, 44, 0.05);
   opacity: 0;
   visibility: hidden;
-  will-change: transform, opacity;
+  will-change: transform, opacity, filter;
   pointer-events: none;
 }
-.anno-index { color: var(--gold); opacity: 1; margin-bottom: 10px; }
+.anno-index {
+  /* deep seal-gold ink — bright gold measured 2.5-2.9:1 on the glass */
+  color: var(--gold-ink); opacity: 1; margin-bottom: 10px; }
 .anno h2 {
   /* the display voice — the same engraved capitals as THE TWINS itself */
   font-family: 'Cinzel', 'Times New Roman', Times, serif;
@@ -545,8 +571,10 @@ a:focus-visible, button:focus-visible {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #dfe9ff;
-  text-shadow: 0 0 12px rgba(120, 180, 255, 0.55);
+  /* slate ink + ice halo — the old pale-blue #dfe9ff was invisible over the
+     bright plain at the exact beat that invites interaction */
+  color: #3c434f;
+  text-shadow: 0 1px 14px rgba(238, 243, 250, 0.95), 0 0 5px rgba(238, 243, 250, 0.8);
   opacity: 0;
   pointer-events: none;
   will-change: transform, opacity;
@@ -555,8 +583,8 @@ a:focus-visible, button:focus-visible {
 .star-label .star-tag {
   font-size: 9px;
   letter-spacing: 0.1em;
-  color: #8fd8ff;
-  border: 1px solid rgba(143, 216, 255, 0.4);
+  color: #8a6014;
+  border: 1px solid rgba(165, 116, 31, 0.45);
   border-radius: 2px;
   padding: 1px 5px;
   opacity: 0;                       /* only the hovered / authorizing star shows it */
@@ -593,13 +621,15 @@ a:focus-visible, button:focus-visible {
 .auth-meta {
   align-self: stretch; margin-top: 3px; padding-top: 9px;
   border-top: 1px solid rgba(43, 48, 56, 0.26);
-  font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase;
-  color: #5b6675; opacity: 0.7;
+  font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase;
+  /* AA floor over bright ice — the 9px #5b6675 at 0.7 read ~2.6:1 */
+  color: #47505c; opacity: 0.95;
+  text-shadow: 0 0 10px rgba(238, 243, 250, 0.85);
 }
 .app-sector { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .app-sector .sec-head {
-  font-size: 8px; letter-spacing: 0.24em; text-transform: uppercase;
-  color: #6a7183;
+  font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: #565e6e;
 }
 .app-sector .sec-row { display: flex; gap: 9px; }
 /* glassmorphic app tile — a pane of frosted ice glass, not a flat card */
@@ -631,8 +661,8 @@ a:focus-visible, button:focus-visible {
 }
 .app-chip .app-ico svg { width: 18px; height: 18px; display: block; color: #5b636f; transition: color 0.5s ease; }
 .app-chip .app-name {
-  font-size: 7.5px; letter-spacing: 0.10em; text-transform: uppercase;
-  color: #767e8e; white-space: nowrap; transition: color 0.5s ease;
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #5b6470; white-space: nowrap; transition: color 0.5s ease;
 }
 /* auth status: a glass pill with a sealed check — hidden until it signs in */
 .app-chip .app-auth {
@@ -641,10 +671,10 @@ a:focus-visible, button:focus-visible {
   background: rgba(255, 255, 255, 0.32);
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  font-size: 7px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
   color: #3c4557; line-height: 1;
   opacity: 0; transform: translateY(4px) scale(0.82);
-  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.2, 1.5, 0.4, 1);
+  transition: opacity 0.4s ease, transform 0.45s var(--ease-spring);
 }
 .app-chip .app-auth .auth-check {
   width: 10px; height: 10px; border-radius: 50%;
@@ -763,7 +793,9 @@ a:focus-visible, button:focus-visible {
   .vt .vw { transform: none; filter: none; }
 }
 @media (max-width: 640px) {
+  .manifesto-sig { letter-spacing: 0.12em; }
   .vt { letter-spacing: 0.16em; }
+  .vt-owner { letter-spacing: 0.14em; white-space: normal; }  /* an 18-char name must fit 375px, wrap at 320px */
   #vow-type { gap: 14px; }
 }
 
@@ -775,7 +807,7 @@ a:focus-visible, button:focus-visible {
 .claim-cta {
   position: fixed;
   left: 50%;
-  bottom: 58px;
+  bottom: calc(58px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%) translateY(10px);
   z-index: 34;
   display: inline-flex;
@@ -795,10 +827,17 @@ a:focus-visible, button:focus-visible {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.45s var(--ease-out), transform 0.45s var(--ease-out), border-color 0.3s ease;
+  /* visibility drops it from the tab order + accessibility tree while hidden:
+     flips on instantly with .on, waits out the fade on hide */
+  visibility: hidden;
+  touch-action: manipulation;
+  transition: opacity 0.45s var(--ease-out), transform 0.45s var(--ease-out),
+              border-color 0.3s ease, visibility 0s linear 0.45s;
 }
-.claim-cta.on { opacity: 1; pointer-events: auto; transform: translateX(-50%); }
+.claim-cta.on { opacity: 1; pointer-events: auto; transform: translateX(-50%); visibility: visible; transition-delay: 0s; }
 .claim-cta:hover { border-color: var(--gold-bright); color: #23272e; }
+/* house 44px touch inflation (the ::before pattern) — invisible, position:fixed contains it */
+.claim-cta::before { content: ''; position: absolute; inset: -8px -10px; }
 .claim-dot { color: var(--gold-bright); font-size: 12px; }
 
 #claim-modal {
@@ -808,29 +847,35 @@ a:focus-visible, button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(160, 165, 177, 0.4);
-  -webkit-backdrop-filter: blur(7px);
-  backdrop-filter: blur(7px);
+  /* plain scrim, no full-screen backdrop-filter: blurring the live WebGL
+     canvas is a compositor tax on every frame (the glass lives on the panel,
+     per the house glass-chip pattern) — scrim strength carries the focus */
+  background: rgba(160, 165, 177, 0.55);
   opacity: 0;
-  transition: opacity 200ms var(--ease-out);
+  /* base = EXIT: quicker, ease-in (transitions retarget, so open/close stays
+     interruptible by construction) */
+  transition: opacity 140ms var(--ease-in);
 }
 #claim-modal[hidden] { display: none; }
-#claim-modal.open { opacity: 1; }
+#claim-modal.open { opacity: 1; transition: opacity 200ms var(--ease-out); }
 /* the panel rises and settles — nothing appears from nothing */
 #claim-modal .claim-panel {
   transform: scale(0.96) translateY(8px);
   opacity: 0;
-  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+  transition: transform 140ms var(--ease-in), opacity 140ms var(--ease-in);
 }
 #claim-modal.open .claim-panel {
   transform: scale(1) translateY(0);
   opacity: 1;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
 }
 .claim-panel {
   position: relative;
   width: min(420px, 88vw);
   padding: 28px 30px 26px;
   background: linear-gradient(168deg, rgba(248, 250, 254, 0.92), rgba(236, 240, 248, 0.85));
+  -webkit-backdrop-filter: blur(13px) saturate(1.25);
+  backdrop-filter: blur(13px) saturate(1.25);   /* the glass-chip pattern — blur on the tile, never the screen */
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-top: 1px solid var(--gold-glow);
   border-radius: 2px;
@@ -857,7 +902,29 @@ a:focus-visible, button:focus-visible {
   opacity: 0.75;
   margin-bottom: 20px;
 }
+/* the field's instrument row — visible label (never placeholder-only) + live counter */
+.claim-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+.claim-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: var(--slate);
+}
+.claim-count {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+  opacity: 0.8;
+}
 #claim-name {
+  outline-offset: 3px;
   width: 100%;
   font-family: inherit;
   font-size: 16px;
@@ -868,11 +935,21 @@ a:focus-visible, button:focus-visible {
   border: none;
   border-bottom: 1px solid rgba(43, 48, 56, 0.35);
   padding: 10px 2px;
-  margin-bottom: 22px;
-  outline: none;
+  margin-bottom: 4px;
+  touch-action: manipulation;
   transition: border-color 0.3s ease;
 }
 #claim-name:focus { border-bottom-color: var(--gold-bright); }
+/* the quiet error line — real text (motion is garnish, never the message);
+   height reserved so showing it never jumps the panel */
+.claim-err {
+  min-height: 15px;
+  margin: 0 0 12px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: var(--slate-dark);
+}
 #claim-name.shake { animation: claim-shake 0.4s ease; }
 @keyframes claim-shake {
   0%, 100% { transform: translateX(0); }
@@ -880,6 +957,7 @@ a:focus-visible, button:focus-visible {
   60% { transform: translateX(5px); }
 }
 .claim-seal {
+  position: relative;
   font-family: inherit;
   font-size: 11px;
   font-weight: 500;
@@ -890,14 +968,29 @@ a:focus-visible, button:focus-visible {
   border: 1px solid var(--gold-bright);
   border-radius: 1px;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background 0.3s ease, color 0.3s ease, transform 160ms var(--ease-out);
 }
 .claim-seal:hover { background: rgba(201, 151, 74, 0.14); color: #23272e; }
+.claim-seal::before { content: ''; position: absolute; inset: -8px -10px; }  /* house 44px inflation */
+/* the sealed beat — one gold flare inside the panel before it hands off to the engraving */
+.claim-seal.sealed {
+  background: rgba(201, 151, 74, 0.14);
+  color: #23272e;
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 18px var(--gold-glow);
+  transition: box-shadow 0.45s var(--ease-out), background 0.3s ease;
+}
+.claim-seal[disabled] { cursor: default; }
 
 /* press feedback — controls depress under the pointer, ~3%, and spring back */
 .claim-seal:active,
 .claim-x:active,
 .hud-sound:active { transform: scale(0.97); }
+/* the press must LAND <100ms — destination transitions govern entering
+   :active, so the depress snaps while the release still breathes */
+.claim-seal:active, .claim-x:active, .hud-sound:active, .social:active,
+.claim-cta.on:active { transition-duration: 70ms; }
 .claim-cta.on:active { transform: translateX(-50%) scale(0.97); }
 .social:active { transform: translateY(-1px) scale(0.97); }
 .claim-x {
@@ -913,11 +1006,13 @@ a:focus-visible, button:focus-visible {
   cursor: pointer;
   opacity: 0.6;
   padding: 6px 8px;
+  touch-action: manipulation;
   transition: opacity 0.25s ease, transform 160ms var(--ease-out);
 }
+.claim-x::before { content: ''; position: absolute; inset: -7px -9px; }  /* house 44px inflation */
 .claim-x:hover { opacity: 1; }
 @media (max-width: 640px) {
-  .claim-cta { bottom: 76px; font-size: 9.5px; letter-spacing: 0.16em; }
+  .claim-cta { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-size: 9.5px; letter-spacing: 0.16em; }
 }
 
 /* the vow, standing with its subjects at the vault beat — world-anchored
@@ -962,15 +1057,17 @@ a:focus-visible, button:focus-visible {
 /* sound toggle */
 .hud-sound {
   position: fixed;
-  left: 44px;
-  bottom: 44px;
+  left: calc(44px + env(safe-area-inset-left, 0px));
+  bottom: calc(44px + env(safe-area-inset-bottom, 0px));
   z-index: 60;
   background: none;
   border: none;
   cursor: pointer;
   font-family: inherit;
   color: var(--hud-color);
-  opacity: 0.65;
+  /* AA at rest: these are live controls — their labels are functional text */
+  opacity: 0.92;
+  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.9), 0 0 6px rgba(238, 243, 250, 0.65);
   /* padding/negative-margin pair: 44px touch target, same visual seat */
   padding: 14px;
   margin: -14px;
@@ -978,7 +1075,7 @@ a:focus-visible, button:focus-visible {
 }
 .hud-sound:hover, .hud-sound:focus-visible { opacity: 1 !important; }  /* wins over the reading-deck whisper */
 /* autoplay toggle sits just right of the sound toggle */
-.hud-auto { left: auto; right: 44px; }
+.hud-auto { left: auto; right: calc(44px + env(safe-area-inset-right, 0px)); }
 .hud-auto[aria-pressed="true"] { opacity: 0.95; }
 .hud-auto[aria-pressed="true"]::before {
   content: '';
@@ -1109,7 +1206,7 @@ a:focus-visible, button:focus-visible {
   background-repeat: no-repeat;
   background-position: 0 96%;
   background-size: 0% 1px;
-  transition: background-size 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.7s;
+  transition: background-size 1.4s var(--ease-out) 0.7s;
 }
 #manifesto.lit .manifesto-text .accent { background-size: 100% 1px; }
 .manifesto-sig {
@@ -1162,7 +1259,11 @@ a:focus-visible, button:focus-visible {
   content: '';
   position: absolute;
   left: -8px; right: -8px;
-  top: -8px; bottom: -8px;
+  top: -15px; bottom: -15px;
+}
+/* 14px link + 30px gap = 44px pitch: adjacent hit zones tile, never overlap */
+@media (pointer: coarse) {
+  .footer-col { gap: 30px; }
 }
 .footer-col-head {
   font-size: 10px;
@@ -1190,7 +1291,7 @@ a:focus-visible, button:focus-visible {
   border-radius: 4px;
   color: var(--slate-dark);
   opacity: 0.65;
-  transition: opacity 0.25s ease, border-color 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.25s ease, border-color 0.25s ease, transform 0.25s var(--ease-out);
 }
 .social::before {
   content: '';
@@ -1253,20 +1354,23 @@ a:focus-visible, button:focus-visible {
   height: 16px;
   opacity: calc(0.42 + 0.26 * var(--pulse, 0));   /* the frame beats with the heart */
 }
-.hud-tl { top: 14px; left: 14px; border-top: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
-.hud-tr { top: 14px; right: 14px; border-top: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
-.hud-bl { bottom: 14px; left: 14px; border-bottom: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
-.hud-br { bottom: 14px; right: 14px; border-bottom: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
+.hud-tl { top: calc(14px + env(safe-area-inset-top, 0px)); left: calc(14px + env(safe-area-inset-left, 0px)); border-top: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
+.hud-tr { top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); border-top: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
+.hud-bl { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: calc(14px + env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--hud-color); border-left: 1px solid var(--hud-color); }
+.hud-br { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--hud-color); border-right: 1px solid var(--hud-color); }
 .hud-coords, .hud-progress {
   position: fixed;
   z-index: 60;
-  bottom: 22px;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   color: var(--hud-color);
-  opacity: 0.68;
+  /* AA over the bright world: near-full ink + the ice-halo lifting the local
+     ground (11px functional text must hold 4.5:1 on its own) */
+  opacity: 0.92;
+  text-shadow: 0 1px 18px rgba(238, 243, 250, 0.9), 0 0 6px rgba(238, 243, 250, 0.65);
   font-variant-numeric: tabular-nums;
 }
-.hud-coords { left: 44px; }
-.hud-progress { right: 44px; }
+.hud-coords { left: calc(44px + env(safe-area-inset-left, 0px)); }
+.hud-progress { right: calc(44px + env(safe-area-inset-right, 0px)); }
 
 /* ============================================================
    CURSOR AURA — a fine survey ring drifting after the pointer
@@ -1283,10 +1387,10 @@ a:focus-visible, button:focus-visible {
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
-  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-              height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-              margin 0.35s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.35s ease;
+  /* growth rides the independent `scale` property: composited, centred by
+     transform-origin, multiplies cleanly with gsap's translate/press-pulse */
+  scale: 1;
+  transition: scale 0.35s var(--ease-out), border-color 0.35s ease;
 }
 #cursor-ring::after {                /* the survey dot at true centre */
   content: '';
@@ -1298,9 +1402,7 @@ a:focus-visible, button:focus-visible {
   background: rgba(76, 79, 83, 0.65);
 }
 #cursor-ring.hot {
-  width: 38px;
-  height: 38px;
-  margin: -8px 0 0 -8px;             /* keep the grown ring centred */
+  scale: 1.727;                      /* 22px -> ~38px, centred by origin */
   border-color: rgba(76, 79, 83, 0.85);
 }
 @media (pointer: coarse) {
@@ -1328,18 +1430,20 @@ a:focus-visible, button:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .anno h2 { font-size: 13px; }
-  .anno p { font-size: 11px; line-height: 1.6; }
+  .anno h2 { font-size: 14px; }
+  /* sustained reading copy, not labels — 11px at arm's length was a strain */
+  .anno p { font-size: 13.5px; line-height: 1.6; }
   .ghost-text { font-size: clamp(30px, 11vw, 54px); }
-  .hud-sound { left: 40px; bottom: 40px; }
-  .hud-auto { left: auto; right: 40px; bottom: 40px; }
+  .hud-sound { left: calc(40px + env(safe-area-inset-left, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .hud-auto { left: auto; right: calc(40px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
   #sound-hint { display: none; }              /* no room beside the toggles on phones */
   /* coords + progress cannot share a 375px line — the sequence readout wins,
      the drifting coordinates yield (they return on wider screens) */
   .hud-coords { display: none; }
-  .hud-progress { right: 40px; bottom: 16px; }
+  .hud-progress { right: calc(40px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   .scroll-cue { bottom: 22px; }
-  .topnav { gap: 12px; }
+  /* 18px gap keeps the ±8px expanded tap zones from overlapping in the seam */
+  .topnav { gap: 18px; }
   .topnav a { font-size: 9.5px; letter-spacing: 0.1em; }
   .wordmark { font-size: 10px; letter-spacing: 0.1em; }
 
@@ -1372,3 +1476,324 @@ a:focus-visible, button:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* short viewports (landscape phones): the desktop HUD would crowd a ~375px-tall
+   frame, and the stacked hero copy would land across the figure — the copy
+   collapses to one line seated just under the feet (copy never crosses the body) */
+@media (max-height: 500px) {
+  .hud-coords { display: none; }
+  .hud-progress { right: calc(40px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .hud-sound { left: calc(40px + env(safe-area-inset-left, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  .hud-auto { left: auto; right: calc(40px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  #sound-hint { display: none; }
+  .hero-sub { display: none; }
+  .hero-line { bottom: 56px; }
+  .scroll-cue { bottom: 12px; }
+}
+
+/* the signature's phrases never break mid-phrase — wraps land at the gold
+   interpuncts */
+.sig-ph { white-space: nowrap; display: inline-block; }
+
+/* THE primary CTA — the documented .cta-enter: bordered mono button, the
+   twin's gold signal-dot breathing on the live heartbeat (--pulse). The
+   magnetic hover comes free (interact.js targets all links). */
+.cta-enter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 36px 0 8px;
+  padding: 15px 30px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--slate-dark);
+  border: 1px solid rgba(76, 79, 83, 0.35);
+  border-radius: 2px;
+  touch-action: manipulation;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+/* RATIFIED 2026-07: the signal is GOLD — the CTA breathes the twin's coin,
+   not the retired cyan */
+.cta-enter:hover {
+  border-color: #d9a84e;
+  box-shadow: 0 0 22px rgba(217, 168, 78, 0.25);
+}
+.cta-enter .cta-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d9a84e;
+  opacity: calc(0.4 + 0.6 * var(--pulse, 0));
+  box-shadow: 0 0 8px rgba(217, 168, 78, 0.8);
+}
+.cta-mail {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  opacity: 0.6;
+  margin-bottom: 28px;
+  user-select: all;                  /* the address is one tap to copy */
+}
+
+
+/* ============================================================
+   THE WORLD OF THETWINS — the film, named (investor/pilot deck)
+   ============================================================ */
+#world, #pilot, #investors {
+  position: relative;
+  z-index: 2;
+  padding: clamp(90px, 14vh, 160px) clamp(20px, 6vw, 80px) clamp(70px, 10vh, 120px);
+  color: var(--slate-dark);
+  background: radial-gradient(1100px 480px at 50% -8%, rgba(238, 243, 250, 0.45), transparent 68%);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+}
+.world-head, .pilot-head, .inv-head {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 14px;
+  visibility: hidden;                 /* typeIn reveals (reduced-motion shows instantly) */
+}
+.world-lede, .pilot-lede {
+  font-size: 12.5px;
+  line-height: 1.65;
+  max-width: 30em;
+  opacity: 0.7;
+  margin-bottom: clamp(36px, 6vh, 64px);
+}
+.world-grid, .phases {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(18px, 3vw, 40px);
+  margin-bottom: clamp(40px, 7vh, 72px);
+}
+@media (max-width: 760px) { .world-grid, .phases { grid-template-columns: 1fr; } }
+.being, .phase {
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+  padding-top: 18px;
+}
+.being-index, .phase-index {
+  font-size: 9.5px; font-weight: 500; letter-spacing: 0.2em;
+  color: var(--gold-ink);
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.being h3, .phase h3 {
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 17px; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.being p, .phase p { font-size: 11.5px; line-height: 1.7; opacity: 0.82; max-width: 26em; }
+.being-meta {
+  margin-top: 12px; font-size: 9.5px; letter-spacing: 0.2em; opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+/* each being carries its one colour as a 5px signal dot — never a fill */
+.being-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+.dot-red  { background: #ff6a55; box-shadow: 0 0 6px rgba(255, 106, 85, 0.8); }
+/* RATIFIED 2026-07: the twin's signal is GOLD (the struck coin) — the cyan
+   legend dot contradicted the gold twin standing in the same frame.
+   The twin reads BRIGHT coin-gold, the vault deep seal-gold. */
+.dot-cyan { background: #e5b45c; box-shadow: 0 0 6px rgba(229, 180, 92, 0.85); }
+.dot-gold { background: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
+
+/* the belief ladder — five numbered declarations, one argument */
+.ladder {
+  list-style: none;
+  max-width: 46em;
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+}
+.ladder li {
+  display: flex; gap: 18px; align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(76, 79, 83, 0.14);
+  font-size: 12.5px; line-height: 1.65;
+}
+.ladder li em {
+  font-style: normal; font-size: 10px; letter-spacing: 0.14em;
+  color: var(--gold); flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.ladder li:last-child { font-weight: 500; letter-spacing: 0.05em; }
+
+/* pilot + investor CTAs reuse the .cta-enter component; the investor dot is
+   the vault's gold (the one amber accent of that view) */
+.cta-pilot { margin-top: 6px; }
+.cta-invest:hover { border-color: var(--gold-bright); box-shadow: 0 0 22px var(--gold-glow); }
+.cta-dot-gold {
+  background: var(--gold-bright) !important;
+  box-shadow: 0 0 8px var(--gold-glow) !important;
+}
+.inv-text { font-size: 13px; line-height: 1.75; max-width: 34em; opacity: 0.85; margin-bottom: 8px; }
+
+/* ============================================================
+   THE HEART CAVERN — in-world reading deck (plates + ladder)
+   Real DOM projected into the cavern by world.js: the same frosted
+   instrument glass as the annos, sized for content, interactive.
+   ============================================================ */
+.plate {
+  position: absolute;
+  z-index: 36;
+  top: 0;
+  left: 0;
+  width: min(360px, 86vw);
+  padding: 20px 22px 18px;
+  color: #2b3038;
+  /* the glass must GUARANTEE its own contrast — over the chamber's brightest
+     wall the old 0.62/0.36 panel let the claims wash to near-invisible */
+  background: linear-gradient(168deg, rgba(246, 249, 253, 0.90), rgba(233, 238, 246, 0.74));
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-top: 1px solid var(--gold-glow);
+  border-radius: 2px;
+  box-shadow: 0 18px 44px rgba(35, 38, 44, 0.10), 0 2px 8px rgba(35, 38, 44, 0.05);
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity, filter;
+  pointer-events: none;          /* world.js grants interaction when seated */
+}
+.plate.live { pointer-events: auto; }
+.plate-index {
+  color: var(--gold-ink);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  margin-bottom: 10px;
+}
+.plate h2 {
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 18px;
+  font-weight: 640;
+  letter-spacing: 0.09em;
+  line-height: 1.35;
+  margin-bottom: 11px;
+  text-transform: uppercase;
+  color: #23272e;
+}
+.plate p {
+  font-size: 11.5px;
+  line-height: 1.65;
+  opacity: 0.82;
+  margin-bottom: 12px;
+}
+.plate-beings { list-style: none; margin: 0; padding: 0; }
+.plate-beings li {
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 7px 0;
+  border-top: 1px solid rgba(43, 48, 56, 0.14);
+}
+.plate-beings li:first-child { border-top: 0; }
+.plate-beings strong { letter-spacing: 0.08em; font-weight: 600; }
+.plate-beings .being-dot { margin-right: 8px; transform: translateY(-1px); }
+.plate-specs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+}
+.pspec { display: flex; flex-direction: column; }
+.pspec .pcount {
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 30px;
+  font-weight: 640;
+  color: #23272e;
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+}
+.pspec em {
+  font-style: normal;
+  color: var(--gold);                /* bright gold measured under 2:1 on the glass */
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  margin-top: -2px;
+  min-height: 12px;
+}
+.pspec i {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #3a404b;                 /* the claims must be READ, not implied */
+  opacity: 0.92;
+  margin-top: 4px;
+}
+.plate-phases { list-style: none; margin: 0 0 14px; padding: 0; counter-reset: ph; }
+.plate-phases li {
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 7px 0;
+  border-top: 1px solid rgba(43, 48, 56, 0.14);
+  opacity: 0.85;
+}
+.plate-phases li:first-child { border-top: 0; }
+.plate-phases em {
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  margin-right: 8px;
+}
+.plate .cta-enter { margin-top: 4px; }
+
+/* the belief ladder — five declarations floating around the heart */
+.decl {
+  position: absolute;
+  z-index: 35;
+  top: 0;
+  left: 0;
+  max-width: min(420px, 78vw);
+  font-size: 15px;                    /* the film's core argument reads as a TITLE, not a caption */
+  line-height: 1.58;
+  letter-spacing: 0.02em;
+  color: #22262d;
+  text-shadow:
+    0 0 3px rgba(240, 246, 252, 1),
+    0 0 14px rgba(240, 246, 252, 1),
+    0 0 34px rgba(240, 246, 252, 0.9);   /* ice-halo with a hard core: readable over bright pillars */
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity, filter;
+  pointer-events: none;
+}
+.decl em {
+  font-style: normal;
+  color: #8a6014;                    /* holds over the bloom, unlike bright gold */
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* world mode: the reading deck lives inside the film — the page sections
+   yield (their content is carried by the plates); the footer remains */
+body.inworld #world,
+body.inworld #specs,
+body.inworld #pilot,
+body.inworld #investors,
+body.inworld #manifesto { display: none; }
+
+@media (max-width: 640px) {
+  .plate { width: min(320px, 88vw); padding: 16px 18px 14px; }
+  .pspec .pcount { font-size: 24px; }
+  /* the persuasion copy reads at phone arm's length — plates included */
+  .plate p, .plate li, .plate .plate-beings li, .plate .plate-phases li { font-size: 13.5px; line-height: 1.6; }
+  .decl { font-size: 14px; max-width: min(320px, 86vw); }
+  .decl em { font-size: 10.5px; }
+}
+
+/* UNDER THE ICE — while the dive film owns the frame (P 0.60-0.782) the
+   instrument inverts to ice-light ink: dark slate drowned on dark frames.
+   Same instrument, same monochrome, inverted key. */
+body.underice #topbar,
+body.underice .hud-coords,
+body.underice .hud-progress,
+body.underice .hud-sound {
+  color: #f2f6fa;
+  opacity: 1;
+  text-shadow: 0 1px 12px rgba(8, 14, 24, 0.95), 0 0 3px rgba(8, 14, 24, 1);
+  transition: color 0.5s ease, text-shadow 0.5s ease;
+}
+body.underice .hud-corner { border-color: rgba(221, 229, 238, 0.75); transition: border-color 0.5s ease; }
+#topbar, .hud-coords, .hud-progress, .hud-sound { transition: color 0.5s ease, text-shadow 0.5s ease; }

@@ -11,9 +11,12 @@
   /* the film owns the frame for the finale — it rises after the wide vault
      shot has rested (scroll snap at 0.91), scrubs the gem awake, and hands
      into the whiteout */
-  const FADE_IN = [0.91, 0.93];
-  const FADE_OUT = [0.97, 0.99];
-  const SCRUB = [0.91, 0.975];
+  /* THE BREACH — windows in MASTER progress space: the macro zoom into
+     the frosted ice owns the vault rest, then hands to the dive film
+     (opaque by 0.622) under the breach frost veil */
+  const FADE_IN = [0.586, 0.600];
+  const FADE_OUT = [0.618, 0.634];
+  const SCRUB = [0.586, 0.634];
 
   /* bright arctic fog — feather the footage into the page, not into black */
   const FOG = '198,204,212';
@@ -37,13 +40,29 @@
     H = canvas.height = (stage.offsetHeight || innerHeight) * dpr;
   }
 
-  function load(i) {
+  /* decode OFF the main thread and pin a predictable footprint: frames are
+     resized at decode to the canvas width (a 375px phone quarters its decoded
+     memory vs 120×1440×810 RGBA ≈ 535MB worst-case; desktop keeps full res).
+     drawImage accepts ImageBitmap unchanged; the Image() path remains for
+     engines without createImageBitmap resize options. */
+  function loadImg(i) {
     return new Promise(res => {
       const img = new Image();
       img.onload = () => { frames[i] = img; loaded++; res(true); };
       img.onerror = () => res(false);
       img.src = SRC(i);
     });
+  }
+  function load(i) {
+    if (window.createImageBitmap) {
+      const rw = Math.min(1440, Math.max(720, Math.ceil(W || 1440)));
+      return fetch(SRC(i))
+        .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
+        .then(b => createImageBitmap(b, { resizeWidth: rw, resizeQuality: 'high' }))
+        .then(bm => { frames[i] = bm; loaded++; return true; })
+        .catch(() => loadImg(i));
+    }
+    return loadImg(i);
   }
 
   /* lazy boot: ~8MB of frames only start downloading once the visitor is
@@ -86,32 +105,52 @@
     const img = nearestFrame(idx);
     if (!img) return;
 
-    // cover-fit the footage
+    // cover-fit the footage — capping the portrait crop: full cover on a tall
+    // screen shows only ~26% of the frame width and loses the cube entirely
+    // (the finale must read INSIDE the vault, not "frost texture with a gem").
+    // 0.78 keeps the cube readable while filling far more of a phone screen
+    // than the old 0.55 band ever did
     const vr = img.width / img.height;
     const cr = W / H;
     let dw, dh;
-    if (cr > vr) { dw = W; dh = W / vr; } else { dh = H; dw = H * vr; }
+    if (cr > vr) { dw = W; dh = W / vr; }
+    else { dw = Math.min(H * vr, W / 0.78); dh = dw / vr; }
     const dx = (W - dw) / 2;
     const dy = (H - dh) / 2;
 
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, dx, dy, dw, dh);
 
-    // feather the edges into the arctic fog
+    /* feather: heavy only where the drawn rect leaves the viewport short
+       (portrait insets melt into the page fog); over a full-bleed frame it
+       is a whisper — a wide 0.9-alpha band reads as a letterbox border */
+    const cov = dy <= 1 && dx <= 1;
+    const bandV = cov ? H * 0.05 : Math.min(dh, H) * 0.16;
+    const bandS = cov ? W * 0.04 : W * 0.10;
+    const aE = cov ? 0.0 : 0.9;   // full-bleed frames get NO border wash — it read as an inset patch
+    const fTop = Math.max(0, dy), fBot = Math.min(H, dy + dh);
+    /* letterboxed (portrait): the void zones above/below the band fill with
+       fog at the film's own alpha — the band floats in weather instead of
+       hard-seaming against the live scene behind */
+    if (!cov) {
+      ctx.fillStyle = `rgba(${FOG},0.92)`;
+      if (fTop > 0) ctx.fillRect(0, 0, W, fTop);
+      if (fBot < H) ctx.fillRect(0, fBot, W, H - fBot);
+    }
     const edges = [
-      ctx.createLinearGradient(0, 0, 0, H * 0.16),
-      ctx.createLinearGradient(0, H, 0, H * 0.84),
-      ctx.createLinearGradient(0, 0, W * 0.10, 0),
-      ctx.createLinearGradient(W, 0, W * 0.90, 0)
+      ctx.createLinearGradient(0, fTop, 0, fTop + bandV),
+      ctx.createLinearGradient(0, fBot, 0, fBot - bandV),
+      ctx.createLinearGradient(0, 0, bandS, 0),
+      ctx.createLinearGradient(W, 0, W - bandS, 0)
     ];
     for (const g of edges) {
-      g.addColorStop(0, `rgba(${FOG},0.9)`);
+      g.addColorStop(0, `rgba(${FOG},${aE})`);
       g.addColorStop(1, `rgba(${FOG},0)`);
     }
-    ctx.fillStyle = edges[0]; ctx.fillRect(0, 0, W, H * 0.16);
-    ctx.fillStyle = edges[1]; ctx.fillRect(0, H * 0.84, W, H * 0.16);
-    ctx.fillStyle = edges[2]; ctx.fillRect(0, 0, W * 0.10, H);
-    ctx.fillStyle = edges[3]; ctx.fillRect(W * 0.90, 0, W * 0.10, H);
+    ctx.fillStyle = edges[0]; ctx.fillRect(0, fTop, W, bandV);
+    ctx.fillStyle = edges[1]; ctx.fillRect(0, fBot - bandV, W, bandV);
+    ctx.fillStyle = edges[2]; ctx.fillRect(0, 0, bandS, H);
+    ctx.fillStyle = edges[3]; ctx.fillRect(W - bandS, 0, bandS, H);
     ctx.globalAlpha = 1;
   }
 
@@ -124,7 +163,7 @@
     get failed() { return failed; },
     setProgress(v) {
       progress = clamp01(v);
-      if (!booted && progress > 0.55) boot();
+      if (!booted && progress > 0.40) boot();
     }
   };
   // dev-only (?forcetick): allow forcing a synchronous draw from eval

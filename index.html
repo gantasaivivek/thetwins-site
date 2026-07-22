@@ -26,6 +26,11 @@
   <link rel="preload" href="assets/fonts/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/Cinzel-Var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/env/poster.jpg" as="image" fetchpriority="high">
+  <!-- the sky pano is the critical horizon asset — preload the right WebP variant -->
+  <!-- crossorigin matches Three.js's anonymous fetch — without it Chrome
+       discards the preload and downloads the 637KB pano twice -->
+  <link rel="preload" href="assets/env/arctic-range.webp" as="image" type="image/webp" media="(min-width: 641px)" crossorigin>
+  <link rel="preload" href="assets/env/arctic-range-mobile.webp" as="image" type="image/webp" media="(max-width: 640px)" crossorigin>
   <link rel="stylesheet" href="css/style.css">
   <!-- resilience: if scripting is unavailable, never trap the visitor behind
        the loader or an empty WebGL canvas — reveal the real HTML content -->
@@ -34,6 +39,14 @@
       #loader, #stars, #figure, #world { display: none !important; }
       #topbar { opacity: 1 !important; }
       .hero-title .ch { opacity: 1 !important; transform: none !important; }
+      /* the protocol copy must survive without a film to carry it: the five
+         annotation cards stack as a static reading column under the hero */
+      #hero-stage { height: auto !important; min-height: 100svh; overflow: visible !important; }
+      .anno {
+        opacity: 1 !important; visibility: visible !important;
+        position: static !important; transform: none !important;
+        width: min(420px, 90vw); margin: 28px auto;
+      }
     </style>
   </noscript>
   <script type="application/ld+json">
@@ -109,7 +122,7 @@
         <i class="scroll-cue-line"></i>
       </div>
 
-      <span id="chapters" class="anchor-ghost" aria-hidden="true"></span>
+      <span id="chapters" class="anchor-ghost"></span>
 
       <!-- ANNOTATION CARDS — igloo telemetry style: code, name, readouts, one line -->
       <article class="anno anno-left" id="anno-1">
@@ -119,7 +132,7 @@
           <div><dt>PULSE</dt><dd data-tel="bpm">— BPM</dd></div>
           <div><dt>PRESENCE</dt><dd>LIVE</dd></div>
         </dl>
-        <p>The living root. A real, present heartbeat.</p>
+        <p>Machines act a million times a day. Only one thing cannot be forged — a present, living heartbeat.</p>
         <div class="anno-meta">D 2026 · ORIGIN</div>
       </article>
 
@@ -130,7 +143,7 @@
           <div><dt>CUSTODY</dt><dd>NON-CUSTODIAL</dd></div>
           <div><dt>REACH</dt><dd>DEVICE-AGNOSTIC</dd></div>
         </dl>
-        <p>A second self you alone own.</p>
+        <p>The question is whether a human meant it. The twin is cast to answer — a second self you alone own.</p>
         <div class="anno-meta">D 2026 · CAST FROM YOU</div>
       </article>
 
@@ -164,21 +177,115 @@
           <div><dt>FACETS</dt><dd>5 RECOVERED</dd></div>
           <div><dt>STATUS</dt><dd data-tel="yr2">SEALED</dd></div>
         </dl>
-        <p>Five blocks. The whole moat.</p>
-        <div class="anno-meta">HOVER A BLOCK · CLICK TO EXPLORE</div>
+        <p>Five facets. The whole moat.</p>
+        <div class="anno-meta" id="facet-hint">HOVER A FACET · CLICK TO EXPLORE</div>
       </article>
+
+      <!-- THE HEART CAVERN — in world mode the reading deck lives INSIDE the
+           film: these plates are real DOM, projected into the cavern every
+           frame by world.js (accessible, selectable, clickable). -->
+      <aside class="plate" id="plate-world" aria-hidden="true">
+        <div class="plate-index">////// INTERIOR_01</div>
+        <h2>THE WORLD OF THETWINS</h2>
+        <ul class="plate-beings">
+          <li><span class="being-dot dot-red" aria-hidden="true"></span><strong>THE HUMAN</strong> — the living root; the only thing that cannot be forged.</li>
+          <li><span class="being-dot dot-cyan" aria-hidden="true"></span><strong>THE TWIN</strong> — a second self, owned by no one else; every agent passes through it.</li>
+          <li><span class="being-dot dot-gold" aria-hidden="true"></span><strong>THE VAULT</strong> — signed intent under one key, built to hold a century.</li>
+        </ul>
+      </aside>
+
+      <aside class="plate" id="plate-specs" aria-hidden="true">
+        <div class="plate-index">////// INTERIOR_02</div>
+        <h2>THE CRYPTOGRAPHIC MOAT</h2>
+        <div class="plate-specs">
+          <div class="pspec"><span class="pcount" data-target="100">0</span><em>YR</em><i>FORWARD SECRECY</i></div>
+          <div class="pspec"><span class="pcount" data-target="256">0</span><em>BIT</em><i>QUANTUM-HYBRID SHIELD</i></div>
+          <div class="pspec"><span class="pcount" data-target="0">0</span><em></em><i>RAW BIOMETRICS STORED</i></div>
+          <div class="pspec"><span class="pcount" data-target="100">0</span><em>%</em><i>HUMAN PRESENCE</i></div>
+        </div>
+      </aside>
+
+      <aside class="plate" id="plate-pilot" aria-hidden="true">
+        <div class="plate-index">////// INTERIOR_03</div>
+        <h2>RUN A PILOT</h2>
+        <ol class="plate-phases">
+          <li><em>SHADOW</em> your twin observes a live signing flow — every action scored for presence and intent.</li>
+          <li><em>BIND</em> agents act only with signed intent — you watch the refusals land.</li>
+          <li><em>SEAL</em> your centennial vault opens, sealed under your key alone.</li>
+        </ol>
+        <a class="cta-enter cta-pilot" href="mailto:hello@thetwins.ai?subject=Pilot%20Program">
+          <span class="cta-dot" aria-hidden="true"></span>
+          RUN A PILOT
+        </a>
+      </aside>
+
+      <aside class="plate" id="plate-invest" aria-hidden="true">
+        <div class="plate-index">////// INTERIOR_04</div>
+        <h2>FOR INVESTORS</h2>
+        <p>You just crossed our proof of execution: one continuous world,
+           built by two people and a protocol. The deck shows what the
+           vault holds next.</p>
+        <a class="cta-enter cta-invest" href="mailto:hello@thetwins.ai?subject=Investor">
+          <span class="cta-dot cta-dot-gold" aria-hidden="true"></span>
+          REQUEST THE DECK
+        </a>
+      </aside>
+
+      <!-- the belief ladder — five declarations orbiting the heart -->
+      <div class="decl" id="decl-1" aria-hidden="true"><em>01</em>Machines now act for us a million times a day, at machine speed.</div>
+      <div class="decl" id="decl-2" aria-hidden="true"><em>02</em>The real question is no longer what they can do — it is whether a human meant it.</div>
+      <div class="decl" id="decl-3" aria-hidden="true"><em>03</em>TheTwins binds every action to a present human and their signed intent.</div>
+      <div class="decl" id="decl-4" aria-hidden="true"><em>04</em>Sovereign, non-custodial, quantum-hardened — nothing to steal, nothing to leak.</div>
+      <div class="decl" id="decl-5" aria-hidden="true"><em>05</em>Enter the twin world.</div>
+    </section>
+
+    <!-- THE WORLD — the film, named. For the visitor who just scrolled it:
+         the three beings and the five-step argument they enact. -->
+    <section id="world">
+      <h2 class="world-head reveal-line">THE WORLD OF THETWINS</h2>
+      <p class="world-lede">You have just crossed it. Here is what you saw.</p>
+      <div class="world-grid">
+        <article class="being">
+          <div class="being-index">////// BEING_01 <span class="being-dot dot-red" aria-hidden="true"></span></div>
+          <h3>THE HUMAN</h3>
+          <p>The living root. A real, present heartbeat on the ice — the only
+             thing in this world that cannot be forged.</p>
+          <div class="being-meta">PRESENCE · LIVE</div>
+        </article>
+        <article class="being">
+          <div class="being-index">////// BEING_02 <span class="being-dot dot-cyan" aria-hidden="true"></span></div>
+          <h3>THE TWIN</h3>
+          <p>A second self, cast from the human and owned by no one else. Every
+             agent that acts must pass through it.</p>
+          <div class="being-meta">CUSTODY · NON-CUSTODIAL</div>
+        </article>
+        <article class="being">
+          <div class="being-index">////// BEING_03 <span class="being-dot dot-gold" aria-hidden="true"></span></div>
+          <h3>THE VAULT</h3>
+          <p>Signed intent, sealed under one key alone and built to hold a
+             century. Nothing to steal. Nothing to leak.</p>
+          <div class="being-meta">SEALED · 100 YR</div>
+        </article>
+      </div>
+      <ol class="ladder">
+        <li><em>01</em>Machines now act for us a million times a day, at machine speed.</li>
+        <li><em>02</em>So the real question is no longer what they can do — it is whether a human meant it.</li>
+        <li><em>03</em>TheTwins binds every action to a present human and their signed intent, through their digital twin.</li>
+        <li><em>04</em>It is sovereign, non-custodial, and quantum-hardened — nothing to steal, nothing to leak.</li>
+        <li><em>05</em>Enter the twin world.</li>
+      </ol>
     </section>
 
     <!-- SPECS -->
     <section id="specs">
-      <div class="specs-head reveal-line">THE CRYPTOGRAPHIC MOAT — BY THE NUMBERS</div>
+      <h2 class="specs-head reveal-line">THE CRYPTOGRAPHIC MOAT — BY THE NUMBERS</h2>
       <div class="specs-grid">
         <div class="spec">
-          <div class="spec-num"><span class="count" data-target="100">0</span><em>YR</em></div>
+          <div class="spec-num"><span class="count" data-target="100">100</span><em>YR</em></div>
           <div class="spec-label">FORWARD SECRECY</div>
         </div>
         <div class="spec">
-          <div class="spec-num"><span class="count" data-target="256">0</span><em>BIT</em></div>
+          <div class="spec-num"><span class="count" data-target="256">256</span><em>BIT</em></div>
           <div class="spec-label">QUANTUM-HYBRID SHIELD</div>
         </div>
         <div class="spec">
@@ -186,15 +293,60 @@
           <div class="spec-label">RAW BIOMETRICS STORED</div>
         </div>
         <div class="spec">
-          <div class="spec-num"><span class="count" data-target="100">0</span><em>%</em></div>
+          <div class="spec-num"><span class="count" data-target="100">100</span><em>%</em></div>
           <div class="spec-label">HUMAN PRESENCE</div>
         </div>
       </div>
     </section>
 
+    <!-- RUN A PILOT — the partner path: concrete, phased, one CTA -->
+    <section id="pilot">
+      <h2 class="pilot-head reveal-line">RUN A PILOT</h2>
+      <p class="pilot-lede">For teams whose agents already move money, sign
+         documents, or touch records — and who need every action to answer to
+         a present human.</p>
+      <div class="phases">
+        <article class="phase">
+          <div class="phase-index">PHASE_01</div>
+          <h3>SHADOW</h3>
+          <p>Your twin observes a live signing flow. Nothing changes; every
+             action is scored for presence and intent.</p>
+        </article>
+        <article class="phase">
+          <div class="phase-index">PHASE_02</div>
+          <h3>BIND</h3>
+          <p>Agents act only with presence and signed intent. Unsigned actions
+             stop at the twin — you watch the refusals land.</p>
+        </article>
+        <article class="phase">
+          <div class="phase-index">PHASE_03</div>
+          <h3>SEAL</h3>
+          <p>Your centennial vault opens. Intent history, sealed under your key
+             alone, quantum-hardened.</p>
+        </article>
+      </div>
+      <a class="cta-enter cta-pilot" href="mailto:hello@thetwins.ai?subject=Pilot%20Program">
+        <span class="cta-dot" aria-hidden="true"></span>
+        RUN A PILOT
+      </a>
+    </section>
+
+    <!-- FOR INVESTORS — one quiet strip; the experience is the proof -->
+    <section id="investors">
+      <h2 class="inv-head reveal-line">FOR INVESTORS</h2>
+      <p class="inv-text">The question is no longer what machines can do; it is
+         whether a human meant it. TheTwins binds every agent action to a living,
+         present human — sovereign, non-custodial, built to hold a century.
+         The experience you just scrolled is our proof of execution.</p>
+      <a class="cta-enter cta-invest" href="mailto:hello@thetwins.ai?subject=Investor">
+        <span class="cta-dot cta-dot-gold" aria-hidden="true"></span>
+        REQUEST THE DECK
+      </a>
+    </section>
+
     <!-- MANIFESTO -->
     <section id="manifesto">
-      <div class="manifesto-eyebrow reveal-line">MANIFESTO</div>
+      <h2 class="manifesto-eyebrow reveal-line">MANIFESTO</h2>
       <p class="manifesto-text">
         In the agentic era, machines act for us a million times a day —
         at machine speed, across every surface, for a hundred years to come.
@@ -204,7 +356,7 @@
         signed intent — sovereign, non-custodial, and built to hold against
         the quantum era. Your identity stays yours. Nothing else touches it.
       </p>
-      <p class="manifesto-sig">ONE HUMAN<i class="gsep">·</i>ONE TWIN<i class="gsep">·</i>EVERY AGENT ACCOUNTABLE</p>
+      <p class="manifesto-sig"><span class="sig-ph">ONE HUMAN</span><i class="gsep">·</i><span class="sig-ph">ONE TWIN</span><i class="gsep">·</i><span class="sig-ph">EVERY AGENT ACCOUNTABLE</span></p>
     </section>
 
   </main>
@@ -258,6 +410,12 @@
       </nav>
 
       <div class="footer-meta">
+        <!-- THE primary CTA (PRODUCT.md: email contact, never buried) -->
+        <a class="cta-enter" href="mailto:hello@thetwins.ai">
+          <span class="cta-dot" aria-hidden="true"></span>
+          ENTER THE TWIN WORLD
+        </a>
+        <div class="cta-mail">hello@thetwins.ai</div>
         <div class="footer-vow">YOUR TWIN. YOUR RULES.</div>
         <div>© 2026 THETWINS INC.</div>
         <div>EARTH ORBIT — SECTOR 7</div>
@@ -292,8 +450,13 @@
       <button class="claim-x" id="claim-x" type="button" aria-label="Close">×</button>
       <div class="claim-eyebrow">////// THE CENTENNIAL VAULT</div>
       <h3 id="claim-title">Seal your name into the vault</h3>
-      <p class="claim-sub">Struck into the platinum ring, letter by letter. Yours for a hundred years.</p>
-      <input id="claim-name" type="text" maxlength="18" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="YOUR NAME" aria-label="Your name">
+      <p class="claim-sub">Struck into the golden seal ring, letter by letter. Yours for a hundred years.</p>
+      <div class="claim-field-head">
+        <label for="claim-name" class="claim-label">NAME — A–Z · 0–9 · 18 MAX</label>
+        <span id="claim-count" class="claim-count" aria-hidden="true">0/18</span>
+      </div>
+      <input id="claim-name" type="text" maxlength="18" autocomplete="name" autocapitalize="characters" spellcheck="false" enterkeyhint="done" placeholder="YOUR NAME">
+      <p id="claim-err" class="claim-err" role="status"></p>
       <button id="claim-seal" class="claim-seal" type="button">SEAL IT</button>
     </div>
   </div>
@@ -334,6 +497,13 @@
             setTimeout(function () { if (l) l.style.display = 'none'; }, 650);
             var bar = document.getElementById('topbar');
             if (bar) bar.style.opacity = '1';   // keep nav usable in the degraded state
+            // the film must never open titleless: if the hero intro tween
+            // never ran, force the copy visible for the degraded visitor
+            var hc = document.getElementById('hero-copy');
+            if (hc) hc.style.opacity = '1';
+            document.querySelectorAll('.hero-title .ch').forEach(function (c) {
+              c.style.opacity = '1'; c.style.transform = 'none';
+            });
           }
         }, DEADLINE);
       });
@@ -347,6 +517,9 @@
   <script src="js/starfield.js"></script>
   <script src="js/figure.js"></script>
   <script src="js/vaultfilm.js"></script>
+  <script src="js/sealfilm.js"></script>
+  <script src="js/divefilm.js"></script>
+  <script src="js/sound.js"></script>
   <script type="module" src="js/world.js"></script>
   <script src="js/footerfx.js"></script>
   <script src="js/main.js"></script>

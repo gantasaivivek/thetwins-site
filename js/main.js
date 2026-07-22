@@ -49,6 +49,8 @@
 
   /* ---------- telemetry type-in for micro labels ---------- */
   function typeIn(el, delay = 0) {
+    /* reduced motion: the label simply is — no cursor flicker */
+    if (reduced) { el.style.visibility = 'visible'; return; }
     const text = el.textContent;
     el.textContent = '';
     el.style.visibility = 'visible';
@@ -112,6 +114,8 @@
   function scrambleIn(el) {
     const target = el.dataset.text || el.textContent;
     el.dataset.text = target;
+    /* reduced motion: no glyph flashing — land on the label instantly */
+    if (reduced) { el.textContent = target; return; }
     let frame = 0;
     const total = 14;
     const tick = () => {
@@ -127,6 +131,17 @@
   }
 
   function enterHero() {
+    /* reduced motion: the hero simply is — no slides, no staggers
+       (typeIn/scrambleIn carry their own guards) */
+    if (reduced) {
+      gsap.set('#topbar', { opacity: 1 });
+      gsap.set('.hero-title .ch', { yPercent: 0, opacity: 1 });
+      gsap.set('.hero-sub', { opacity: 0.92, y: 0 });
+      gsap.set('.hero-line', { opacity: 0.68, y: 0 });
+      gsap.set('.scroll-cue', { opacity: 0.7 });
+      const eb = $('.hero-eyebrow'); if (eb) eb.style.visibility = 'visible';
+      return;
+    }
     gsap.to('#topbar', { opacity: 1, duration: 1, ease: 'power2.out' });
     /* the HUD scrambles at once on arrival (igloo move) — but NOT the sound
        toggle: it carries live state (SOUND: ON/OFF) and scrambling would cache
@@ -150,6 +165,10 @@
   }
 
   /* ---------- pinned hero scrub ---------- */
+  /* deferred: the HUD/vow boundary trigger is created once the render mode
+     is known (world mode hides the reading deck — its boundary is the
+     footer; the no-WebGL fallback keeps the deck and bounds at #world) */
+  let boundaryMade = false;
   const proxy = { p: 0 };
   const heroCopy = $('#hero-copy');
   const cue = $('#scroll-cue');
@@ -183,8 +202,22 @@
     { el: annos[3], in: 0.885, hold: 0.91, out: 0.945 },
     { el: annos[4], in: 0.60, hold: 0.70, out: 0.79 }
   ];
-  // snap rests dwell on each card so the narrative never rushes
-  const SNAPS = [0, 0.09, 0.27, 0.36, 0.53, 0.70, 0.91, 1];
+  /* THE DESCENT warp: the pin grew from 1080% to 1750%, and the whole
+     legacy journey now lives in master P ∈ [0, LEGACY_END] — the same real
+     scroll pixels per beat as before, so every proven act plays identically.
+     Legacy-authored windows receive p = warpLegacy(P); the new chapters —
+     the breach, the dive, the heart cavern, the return — are authored
+     directly in master P. */
+  const LEGACY_END = 0.615, LEGACY_CAP = 0.955;
+  const warpLegacy = P => P <= LEGACY_END ? (P / LEGACY_END) * LEGACY_CAP : LEGACY_CAP;
+  window.__warpLegacy = warpLegacy;
+  const L = p => p * (LEGACY_END / LEGACY_CAP);        // legacy beat → master P
+  // snap rests dwell on each beat: the legacy acts, then the descent's own
+  // stations — the throat of the dive, the heart, the specs wall, the seal
+  /* 0.705 (not 0.695) — the dive's dwell station must rest on a luminous
+     frame, not the darkest one; 0.952 — the investor ask gets its own rest */
+  const SNAPS = [0, L(0.09), L(0.27), L(0.36), L(0.53), L(0.70), L(0.91),
+                 0.705, 0.80, 0.865, 0.925, 0.952, 1];
 
   function cardAlpha(p, c) {
     const rise = gsap.utils.clamp(0, 1, (p - c.in) / 0.05);
@@ -197,7 +230,7 @@
     start: 'top top',
     // longer pin = more scroll distance per beat = a slower, more
     // deliberate, cinematic descent (nothing rushes between cards)
-    end: reduced ? '+=100%' : '+=1080%',
+    end: reduced ? '+=100%' : '+=1750%',
     pin: true,
     scrub: reduced ? true : 1.0,          // tighter tracking — the world follows you directly
     snap: reduced ? false : {
@@ -206,17 +239,43 @@
       ease: 'power2.inOut',
       delay: 0.08
     },
+    onToggle(self) {
+      /* pin released (or re-entered): keep the starfield gate honest even
+         when onUpdate stops firing outside the trigger */
+      window.__filmPinned = !!(window.WORLD && window.WORLD.ready) && self.isActive;
+    },
     onUpdate(self) {
-      const p = self.progress;
-      proxy.p = p;
+      const P = self.progress;                 // master progress — the whole descent
+      const p = warpLegacy(P);                 // legacy-authored beats read this
+      /* the narrator: legacy scenes carry the surface acts, the vault line
+         holds through the dive + cavern, the vow speaks at the true finale */
+      const storyP = P <= LEGACY_END ? p : (P < 0.955 ? 0.94 : Math.min(1.0, P));
+      proxy.p = storyP;
 
-      window.SCENE_NARRATE?.(p);   // the narrator speaks the exact scene you're in
+      window.SCENE_NARRATE?.(storyP);
 
       const worldMode = window.WORLD && window.WORLD.ready;
+      /* the starfield reads this to skip painting while the opaque film
+         fully covers it (the whole pinned journey) */
+      window.__filmPinned = !!worldMode && self.isActive;
+      /* the mode is settled by the first real scroll: in world mode the
+         reading deck lives INSIDE the film, so the page sections yield */
+      if (!boundaryMade && (worldMode || P > 0.5)) {
+        boundaryMade = true;
+        /* REDUCED visitors keep the static reading deck: their pin is a calm
+           100% hero, so folding the content into the film would leave them
+           with ~60px per beat and no readable sections at all */
+        if (worldMode && !reduced) document.body.classList.add('inworld');
+        makeBoundary(worldMode && !reduced ? '#footer' : '#world');
+        gsap.delayedCall(0, () => ScrollTrigger.refresh());
+      }
       if (worldMode) {
         // 3D fog world owns the journey; page stays in the light theme
-        window.WORLD.setProgress(p);
-        window.VAULTFILM?.setProgress(p);   // finale macro film (inside the ice)
+        window.WORLD.setProgress(P);        // the world warps legacy acts itself
+        window.VAULTFILM?.setProgress(P);   // THE BREACH — the zoom into the ice
+        window.SEALFILM?.setProgress(p);    // the signature macro film (the vow, struck)
+        window.DIVEFILM?.setProgress(P);    // the descent film (master-authored)
+        window.SOUNDWORLD?.setProgress(P);  // the sound world rides the dive
         window.__scrollP = 0.06;
       } else {
         window.HERO?.setProgress(p);
@@ -244,13 +303,15 @@
 
       // HUD telemetry: drifting arctic coordinates, then temporal drift —
       // the finale counts the century the vault must hold (igloo instrument)
-      hudPct.textContent = String(Math.round(p * 100)).padStart(3, '0');
-      const drift = gsap.utils.clamp(0, 1, (p - 0.86) / 0.09);
+      hudPct.textContent = String(Math.round(P * 100)).padStart(3, '0');
+      /* the descent falls through the century — the drift begins at the
+         vault and counts the hundred years down through the ice */
+      const drift = gsap.utils.clamp(0, 1, (P - 0.586) / 0.35);
       if (drift > 0) {
         hudCoords.textContent = `TEMPORAL DRIFT — YEAR ${2026 + Math.round(drift * 100)}`;
       } else {
-        const lat = (58.3019 - p * 12.4).toFixed(4);
-        const lon = (134.4197 + p * 22.7).toFixed(4);
+        const lat = (58.3019 - P * 12.4).toFixed(4);
+        const lon = (134.4197 + P * 22.7).toFixed(4);
         hudCoords.textContent = `${lat}° N — ${lon}° W`;
       }
 
@@ -259,7 +320,7 @@
          sound off: the same line on a 4s internal read) and hold over the
          final resting frame. Scrubbing back re-arms it. */
       if (vowEl) {
-        const inVow = p > 0.956;
+        const inVow = P > 0.974;
         if (inVow && !vowShown) {
           vowShown = true;
           vowClock = performance.now();
@@ -267,7 +328,7 @@
         }
         if (inVow) {
           vowEl.style.visibility = 'visible';
-          vowEl.style.opacity = String(gsap.utils.clamp(0, 1, (p - 0.956) / 0.012));
+          vowEl.style.opacity = String(gsap.utils.clamp(0, 1, (P - 0.974) / 0.010));
         } else if (vowShown) {
           vowShown = false;                            // stops the ticker
           vowEl.style.opacity = '0';
@@ -276,7 +337,11 @@
         }
       }
 
-      $('#topbar').classList.toggle('scrolled', p > 0.01);
+      $('#topbar').classList.toggle('scrolled', P > 0.006);
+      /* UNDER THE ICE the instrument inverts to ice-light ink — dark slate
+         text drowned on the dive's dark frames (still monochrome, still
+         the same instrument; igloo's own dark-frame discipline) */
+      document.body.classList.toggle('underice', P > 0.60 && P < 0.782);
     }
   });
 
@@ -333,9 +398,16 @@
     if (autoTween) { autoTween.kill(); autoTween = null; }
     clearTimeout(autoTimer);
   }
-  // any direct scroll input hands control to the user
+  // any direct scroll input hands control to the user (this also cancels a
+  // nav-anchor glide — the same tween drives both). userMoved keeps the
+  // deferred auto-tour kickoff from seizing a visitor who already took over.
+  let userMoved = false;
   ['wheel', 'touchstart', 'pointerdown'].forEach(ev =>
-    addEventListener(ev, () => { if (autoOn) stopAuto(); }, { passive: true }));
+    addEventListener(ev, () => {
+      userMoved = true;
+      if (autoOn) stopAuto();
+      else if (autoTween) { autoTween.kill(); autoTween = null; }
+    }, { passive: true }));
   addEventListener('keydown', e => {
     if (autoOn && [' ', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(e.key)) stopAuto();
   });
@@ -344,7 +416,7 @@
     setAutoLabel();
   }
   // expose so the loader can kick the journey off once the hero has settled
-  window.__startAuto = () => startAuto(true);
+  window.__startAuto = () => { if (!userMoved && scrollY < 40) startAuto(true); };
 
   /* ---------- specs count-up ---------- */
   ScrollTrigger.create({
@@ -355,16 +427,21 @@
       typeIn($('.specs-head'));
       $$('.count').forEach((el, i) => {
         const target = +el.dataset.target;
+        /* reserve the final width so the gold unit never slides during the
+           count (values are authored in markup; tabular-nums holds digits) */
+        el.style.minWidth = String(target).length + 'ch';
+        el.style.display = 'inline-block';
+        if (reduced) { el.textContent = String(target); return; }   // the number simply is
         const o = { v: 0 };
+        el.textContent = '0';
         gsap.to(o, {
           v: target,
-          duration: reduced ? 0.3 : 2.1,
+          duration: 2.1,
           delay: i * 0.12,
           ease: 'power4.out',          // races up, then lands with weight
           onUpdate: () => { el.textContent = String(Math.round(o.v)); },
           onComplete() {
             /* the number seats itself — a breath of cold light on arrival */
-            if (reduced) return;
             const num = el.closest('.spec-num');
             if (num) gsap.fromTo(num,
               { textShadow: '0 0 26px rgba(181,213,255,0.85)' },
@@ -372,11 +449,42 @@
           }
         });
       });
+      if (reduced) { gsap.set('.spec', { opacity: 1, y: 0 }); return; }
       gsap.fromTo('.spec',
         { opacity: 0, y: 24 },
         { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.1 });
     }
   });
+
+  /* ---------- investor/pilot deck reveals (world · pilot · investors) ---------- */
+  for (const [sel, head, cards] of [
+    ['#world', '.world-head', '.being'],
+    ['#pilot', '.pilot-head', '.phase'],
+    ['#investors', '.inv-head', null]
+  ]) {
+    ScrollTrigger.create({
+      trigger: sel,
+      start: 'top 72%',
+      once: true,
+      onEnter() {
+        const headEl = $(head);
+        if (headEl) typeIn(headEl);
+        const items = cards ? $$(sel + ' ' + cards) : [];
+        if (reduced) {
+          if (items.length) gsap.set(items, { opacity: 1, y: 0 });
+          gsap.set(sel + ' .ladder li, ' + sel + ' .cta-enter, ' + sel + ' .world-lede, ' + sel + ' .pilot-lede, ' + sel + ' .inv-text', { opacity: 1, y: 0 });
+          return;
+        }
+        if (items.length) gsap.fromTo(items,
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.9, ease: 'power2.out', stagger: 0.12 });
+        const rows = $$(sel + ' .ladder li');
+        if (rows.length) gsap.fromTo(rows,
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.7, ease: 'power2.out', stagger: 0.05, delay: 0.3 });
+      }
+    });
+  }
 
   /* ---------- manifesto reveal ---------- */
   ScrollTrigger.create({
@@ -385,12 +493,17 @@
     once: true,
     onEnter() {
       typeIn($('.manifesto-eyebrow'));
-      gsap.fromTo('.manifesto-text',
-        { opacity: 0, y: 26 },
-        { opacity: 0.9, y: 0, duration: 1.2, ease: 'power2.out' });
-      gsap.fromTo('.manifesto-sig',
-        { opacity: 0 },
-        { opacity: 0.8, duration: 1, delay: 0.5, ease: 'power2.out' });
+      if (reduced) {
+        gsap.set('.manifesto-text', { opacity: 0.88, y: 0 });
+        gsap.set('.manifesto-sig', { opacity: 0.92 });
+      } else {
+        gsap.fromTo('.manifesto-text',
+          { opacity: 0, y: 26 },
+          { opacity: 0.88, y: 0, duration: 1.2, ease: 'power2.out' });
+        gsap.fromTo('.manifesto-sig',
+          { opacity: 0 },
+          { opacity: 0.92, duration: 1, delay: 0.5, ease: 'power2.out' });
+      }
       $('#manifesto').classList.add('lit');   // the amber phrase draws its underline
     }
   });
@@ -403,32 +516,43 @@
     onEnter() { $$('.footer-col-head').forEach(scrambleIn); }
   });
 
-  /* ---------- the instrument yields to the reading deck ----------
-     Past the film, the page becomes editorial: the drifting coordinates and
-     sequence readout would collide with real copy, so the frame telemetry
-     dims out and returns when the visitor scrolls back into the world. */
-  ScrollTrigger.create({
-    trigger: '#specs',
+  /* ---------- the instrument yields at the world's edge ----------
+     Past the film, the frame telemetry dims out and returns when the
+     visitor scrolls back in. In world mode all content lives inside the
+     film, so the boundary is the footer; the no-WebGL fallback keeps the
+     reading deck and bounds at #world. Created once the mode is known. */
+  function makeBoundary(sel) { ScrollTrigger.create({
+    trigger: sel,
     start: 'top 88%',
     onEnter() {
       /* the vow title card steps aside as the reading deck arrives (it is
          position:fixed and would otherwise hang over the specs copy) */
-      if (vowEl) { vowEl.style.opacity = '0'; vowEl.style.visibility = 'hidden'; }
+      if (vowEl) {
+        gsap.killTweensOf(vowEl);
+        gsap.to(vowEl, { opacity: 0, duration: 0.35, ease: 'power2.in',
+          onComplete: () => { vowEl.style.visibility = 'hidden'; } });
+      }
       gsap.to('.hud-coords, .hud-progress, .hud-corner', { opacity: 0, duration: 0.5, ease: 'power2.out' });
-      /* live controls stay usable but whisper (full voice on hover/focus) */
-      gsap.to('.hud-sound', { opacity: 0.22, duration: 0.5 });
+      /* live controls quiet down but must stay findable at rest: 0.85 is the
+         AA floor over the halo-lit deck (0.22 measured ~1.3:1 — invisible to
+         exactly the low-vision users who cannot hover to rescue it) */
+      gsap.to('.hud-sound', { opacity: 0.85, duration: 0.5 });
     },
     onLeaveBack() {
-      gsap.to('.hud-coords, .hud-progress', { opacity: 0.68, duration: 0.6 });
+      gsap.to('.hud-coords, .hud-progress', { opacity: 0.92, duration: 0.6 });
       /* clearProps hands opacity back to the CSS calc(--pulse) breathing */
       gsap.to('.hud-corner', { opacity: 0.55, duration: 0.6,
         onComplete() { gsap.set('.hud-corner', { clearProps: 'opacity' }); } });
-      gsap.to('.hud-sound', { opacity: 0.65, duration: 0.6 });
+      gsap.to('.hud-sound', { opacity: 0.92, duration: 0.6 });
       /* returning to the film's resting end: the title card comes back
          (progress is pinned at 1 there, so onUpdate can't restore it) */
-      if (vowEl && vowShown) { vowEl.style.visibility = 'visible'; vowEl.style.opacity = '1'; }
+      if (vowEl && vowShown) {
+        gsap.killTweensOf(vowEl);
+        vowEl.style.visibility = 'visible';
+        gsap.to(vowEl, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+      }
     }
-  });
+  }); }
 
   /* ---------- cinematic audio: story narration + soft accents (sound toggle) ----
      The scroll IS a guided film. When the visitor turns sound on, a calm
@@ -731,6 +855,7 @@
       if (!audioCtx) startAudio();
       const on = windGain.gain.value < 0.01;
       soundOn = on;
+      window.__soundOn = on;               // the sound world (sound.js) follows
       windGain.gain.linearRampToValueAtTime(on ? 0.5 : 0, audioCtx.currentTime + 1.4);
       soundBtn.textContent = on ? 'SOUND: ON' : 'SOUND: OFF';
       soundBtn.setAttribute('aria-pressed', String(on));
@@ -744,10 +869,40 @@
     });
   }
 
-  /* ---------- smooth anchor scrolling ---------- */
+  /* ---------- smooth anchor scrolling ----------
+     In world mode the reading sections are folded INTO the film, so their
+     anchors must fly to the corresponding film beat instead of a hidden
+     element (a display:none target reads rect.top 0 and would dump the
+     visitor back at the hero). Both destinations are snap stations, so the
+     scroll settles exactly on the beat. */
+  /* phones have no hover — the facet card must teach the gesture that works
+     (world.js expands a facet on first tap, opens it on the second) */
+  if (matchMedia('(pointer: coarse)').matches) {
+    const fh = $('#facet-hint');
+    if (fh) fh.textContent = 'TAP A FACET · TAP AGAIN TO EXPLORE';
+  }
+
+  const FILM_ANCHORS = { '#chapters': L(0.27), '#manifesto': 0.80 };
   $$('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
-      const target = $(a.getAttribute('href'));
+      const href = a.getAttribute('href');
+      const inworld = document.body.classList.contains('inworld');
+      if (inworld && (FILM_ANCHORS[href] !== undefined || a.classList.contains('skip-link'))) {
+        e.preventDefault();
+        try { stopAuto(); } catch (_) { /* not armed yet */ }
+        if (a.classList.contains('skip-link')) {
+          const y = $('#footer').getBoundingClientRect().top + scrollY;
+          window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
+        } else if (reduced) {
+          window.scrollTo(0, yForP(FILM_ANCHORS[href]));
+        } else {
+          /* a GSAP glide outruns any in-flight snap tween — a native smooth
+             scroll loses that race and dumped the click at the first snap */
+          glideToP(FILM_ANCHORS[href], 1.4);
+        }
+        return;
+      }
+      const target = $(href);
       if (!target) return;
       e.preventDefault();
       const y = target.getBoundingClientRect().top + scrollY;
@@ -767,35 +922,84 @@
     const cta = $('#claim-cta'), modal = $('#claim-modal'),
           nameIn = $('#claim-name'), sealBtn = $('#claim-seal'),
           closeBtn = $('#claim-x'), ownerDd = $('#owner-dd'),
-          vtOwner = $('#vt-owner'), vwName = $('#vw-owner-name');
+          vtOwner = $('#vt-owner'), vwName = $('#vw-owner-name'),
+          errEl = $('#claim-err'), countEl = $('#claim-count');
+    /* what the punch can strike — diacritics fold to their base letters
+       (JOSÉ -> JOSE, never JOS), then the engravable set applies. The field
+       shows exactly what will be struck: the preview IS the truth. */
+    const engravable = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9 '.\-]/g, '').replace(/\s+/g, ' ');
+    const setError = (msg) => {
+      if (errEl) errEl.textContent = msg || '';
+      if (!nameIn) return;
+      if (msg) { nameIn.setAttribute('aria-invalid', 'true'); nameIn.setAttribute('aria-describedby', 'claim-err'); }
+      else { nameIn.removeAttribute('aria-invalid'); nameIn.removeAttribute('aria-describedby'); }
+    };
+    const setCount = () => { if (countEl && nameIn) countEl.textContent = `${nameIn.value.length}/18`; };
+    const ownerName = () => {
+      try { return localStorage.getItem('twinsVaultOwner'); } catch { return null; }
+    };
     const applyOwner = (name) => {
       window.__vaultOwned = true;
       if (ownerDd) ownerDd.textContent = `${name} — SOLE KEY`;
       if (vtOwner && vwName) { vwName.textContent = name + '.'; vtOwner.hidden = false; }
+      /* the pill stays on as the owner's quiet re-strike path — a typo'd
+         name must never be permanent */
+      if (cta) cta.innerHTML = `<span class="claim-dot" aria-hidden="true">◈</span> SEALED FOR ${name}`;
     };
-    const stored = (() => {
-      try { return localStorage.getItem('twinsVaultOwner'); } catch { return null; }
-    })();
+    const stored = ownerName();
     if (stored) {
       applyOwner(stored);
       /* the world may still be booting — engrave as soon as the API exists */
       const arm = () => window.VAULT ? window.VAULT.engrave(stored, true) : setTimeout(arm, 250);
       arm();
     }
+    /* the film holds still behind the open dialog — wheel, touch and nav keys
+       must not drive the ScrollTrigger pipeline mid-form */
+    const blockScroll = (e) => e.preventDefault();
+    const NAV_KEYS = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
+    const blockKeys = (e) => {
+      if (modal.hidden) return;
+      if (NAV_KEYS.includes(e.key) && e.target !== nameIn) e.preventDefault();
+    };
+    let lastFocus = null;
     const open = () => {
       if (!modal) return;
+      lastFocus = document.activeElement;
+      const owned = ownerName();
+      if (nameIn && owned && !nameIn.value) nameIn.value = owned;
+      if (sealBtn) {
+        sealBtn.disabled = false;
+        sealBtn.classList.remove('sealed');
+        sealBtn.textContent = owned ? 'RE-STRIKE' : 'SEAL IT';
+      }
+      setError('');
+      setCount();
       modal.hidden = false;
       /* double rAF: the browser must paint the hidden→flex frame before the
          .open transition can play (transitions retarget, so open/close is
          interruptible by construction) */
       requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add('open')));
       try { stopAuto(); } catch (_) { /* autoplay not armed yet */ }
+      addEventListener('wheel', blockScroll, { passive: false });
+      addEventListener('touchmove', blockScroll, { passive: false });
+      document.addEventListener('keydown', blockKeys, true);
       setTimeout(() => nameIn && nameIn.focus(), 240);
     };
     const close = () => {
       if (!modal) return;
       modal.classList.remove('open');
-      setTimeout(() => { modal.hidden = true; }, 200);   // matches the opacity exit
+      removeEventListener('wheel', blockScroll);
+      removeEventListener('touchmove', blockScroll);
+      document.removeEventListener('keydown', blockKeys, true);
+      setTimeout(() => {
+        modal.hidden = true;
+        /* focus returns to where the visitor left the film — the CTA pill
+           when nothing better was focused (Safari doesn't focus clicked buttons) */
+        const back = (lastFocus && lastFocus !== document.body && document.contains(lastFocus))
+          ? lastFocus : cta;
+        back && back.focus && back.focus();
+      }, 160);   // lands just after the 140ms exit settles
     };
     cta && cta.addEventListener('click', open);
     closeBtn && closeBtn.addEventListener('click', close);
@@ -803,15 +1007,46 @@
     document.addEventListener('keydown', (e) => {
       if (modal && !modal.hidden && e.key === 'Escape') close();
     });
-    /* typing must never scroll the film or trip the autoplay key handler */
+    /* focus stays inside the dialog while it is open (aria-modal promises
+       the rest of the page does not exist — Tab must agree) */
+    modal && modal.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const ring = [closeBtn, nameIn, sealBtn].filter(el => el && !el.disabled);
+      if (!ring.length) return;
+      const i = ring.indexOf(document.activeElement);
+      if (e.shiftKey) {
+        if (i <= 0) { e.preventDefault(); ring[ring.length - 1].focus(); }
+      } else if (i === -1 || i === ring.length - 1) {
+        e.preventDefault(); ring[0].focus();
+      }
+    });
+    /* typing must never scroll the film or trip the autoplay key handler —
+       but Escape belongs to the dialog, so it is handled before the wall */
     nameIn && nameIn.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { close(); return; }
       e.stopPropagation();
       if (e.key === 'Enter') sealBtn && sealBtn.click();
     });
+    /* live filter: the field always holds the exact engravable strike,
+       caret preserved so mid-word edits never jump to the end */
+    nameIn && nameIn.addEventListener('input', () => {
+      const raw = nameIn.value;
+      const clean = engravable(raw).slice(0, 18);
+      if (clean !== raw) {
+        const at = nameIn.selectionStart || 0;
+        const delta = raw.length - clean.length;
+        nameIn.value = clean;
+        const pos = Math.max(0, at - delta);
+        try { nameIn.setSelectionRange(pos, pos); } catch (_) { /* type=text always supports it */ }
+      }
+      setError('');
+      setCount();
+    });
     sealBtn && sealBtn.addEventListener('click', () => {
-      const name = (nameIn.value || '')
-        .toUpperCase().replace(/[^A-Z0-9 '.\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+      if (sealBtn.disabled) return;                      // no double strike during the sealed beat
+      const name = engravable(nameIn.value || '').trim().slice(0, 18);
       if (!name) {
+        setError('ENTER A NAME TO SEAL');                // the message is text; the shake is garnish
         nameIn.classList.add('shake');
         setTimeout(() => nameIn.classList.remove('shake'), 450);
         nameIn.focus();
@@ -819,9 +1054,89 @@
       }
       try { localStorage.setItem('twinsVaultOwner', name); } catch (_) { /* private mode */ }
       applyOwner(name);
-      close();
-      window.VAULT && window.VAULT.engrave(name);
-      window.SFX && window.SFX.telemetry && window.SFX.telemetry(9);
+      /* the sealed beat — one gold breath inside the panel (and the SR
+         announcement via the status line), then the world takes over */
+      sealBtn.disabled = true;
+      sealBtn.classList.add('sealed');
+      sealBtn.textContent = 'SEALED ◈';
+      if (errEl) errEl.textContent = `SEALED FOR ${name}`;
+      setTimeout(() => {
+        close();
+        window.VAULT && window.VAULT.engrave(name);
+        window.SFX && window.SFX.telemetry && window.SFX.telemetry(9);
+      }, 500);
     });
+  }
+
+  /* ---------- dev-only capture contract (?freeze=<P>) ----------
+     Headless screenshots can't drive the scroll pipeline, so this lands the
+     whole stack — world, films, plates — at one master P with the page at
+     scrollY 0 (the pin transform confuses composite-less captures). Sets
+     window.__frozen when the frame is fully staged. Inert without the param. */
+  {
+    const fz = new URLSearchParams(location.search).get('freeze');
+    if (fz !== null) {
+      const P = Math.min(1, Math.max(0, parseFloat(fz) || 0));
+      const stage = () => {
+        if (!(window.WORLD && window.WORLD.ready)) { setTimeout(stage, 200); return; }
+        stopAuto();
+        const l = document.getElementById('loader');
+        if (l) l.style.display = 'none';
+        const sh = document.getElementById('sound-hint');
+        if (sh) sh.style.display = 'none';   /* froze mid-fade as a ghost in captures */
+        /* the hero copy BELONGS to the opening frames — hiding it at P<0.03
+           made the captured opening read as a titleless film */
+        if (P > 0.03) {
+          const hc = document.getElementById('hero-copy');
+          if (hc) hc.style.display = 'none';
+          const cueEl = document.getElementById('scroll-cue');
+          if (cueEl) cueEl.style.display = 'none';
+        }
+        /* settle a few frames at the hero first — a real visitor always
+           enters there, and materials that compile mid-journey on their
+           first frame can smear NaN through the bloom chain */
+        window.WORLD.setProgress(0.001);
+        setTimeout(seat, 900);
+      };
+      const seat = () => {
+        const p = warpLegacy(P);
+        /* step through the CAST first (one beat at master 0.09) so the
+           twin's materials first-render on the same path a real visitor's
+           do — seating a cold session directly at P∈[0.115,0.13] lands the
+           twin's first frame at legacy p≈0.19, which deterministically
+           poisons its transmission into the black-body mode */
+        window.WORLD.setProgress(Math.min(P, 0.067));
+        setTimeout(() => {
+        window.WORLD.setProgress(P);
+        window.WORLD.setProgress = () => {};
+        window.VAULTFILM?.setProgress(P);
+        window.SEALFILM?.setProgress(p);
+        window.DIVEFILM?.setProgress(P);
+        const dive = window.DIVEFILM, seal = window.SEALFILM, vault = window.VAULTFILM;
+        if (dive) dive.setProgress = () => {};
+        if (seal) seal.setProgress = () => {};
+        if (vault) vault.setProgress = () => {};
+        if (P > 0.55 && window.__bootDiveFilm) window.__bootDiveFilm();
+        /* the scroll pipeline never runs under freeze, so stage its DOM
+           truthfully too: HUD telemetry, topbar state, and the finale vow —
+           captures must show what a real scrolling visitor sees */
+        hudPct.textContent = String(Math.round(P * 100)).padStart(3, '0');
+        const fdrift = gsap.utils.clamp(0, 1, (P - 0.586) / 0.35);
+        hudCoords.textContent = fdrift > 0
+          ? `TEMPORAL DRIFT — YEAR ${2026 + Math.round(fdrift * 100)}`
+          : `${(58.3019 - P * 12.4).toFixed(4)}° N — ${(134.4197 + P * 22.7).toFixed(4)}° W`;
+        $('#topbar').classList.toggle('scrolled', P > 0.006);
+        document.body.classList.toggle('underice', P > 0.60 && P < 0.782);
+        if (vowEl && P > 0.974) {
+          vowEl.style.visibility = 'visible';
+          vowEl.style.opacity = String(gsap.utils.clamp(0, 1, (P - 0.974) / 0.010));
+          for (const w of vowWords) w.classList.add('on');
+        }
+        /* let the film loaders catch up before declaring the frame staged */
+        setTimeout(() => { window.__frozen = true; }, 2500);
+        }, 450);   // one settled beat on the cast path before the seat
+      };
+      setTimeout(stage, 400);
+    }
   }
 })();
