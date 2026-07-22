@@ -8,14 +8,16 @@
    assets/video/seal/frame-XXXX.jpg. If missing, SEALFILM.ready stays false
    and the beat plays as it always did. */
 (function () {
-  const FRAME_COUNT = 121;               // set by extraction step
+  const FRAME_COUNT = 162;               // set by extraction step (F2 extension)
   const SRC = i => `assets/video/seal/frame-${String(i + 1).padStart(4, '0')}.jpg`;
 
-  /* the film rises after the auth beat settles, holds through the vow, and
-     hands into the frost veil's scene change */
+  /* the film rises after the auth beat settles, holds through the vow —
+     now with AIR: the strike settles, the camera pulls back over the whole
+     engraved ring (rest at legacy 0.486), and frost grows across the LENS
+     until the film exits by BECOMING the frost veil it hands into */
   const FADE_IN = [0.398, 0.418];
-  const FADE_OUT = [0.472, 0.498];
-  const SCRUB = [0.398, 0.492];
+  const FADE_OUT = [0.496, 0.522];
+  const SCRUB = [0.398, 0.516];
 
   /* bright arctic fog — feather the footage into the page, not into black */
   const FOG = '198,204,212';
@@ -30,6 +32,7 @@
 
   const frames = new Array(FRAME_COUNT).fill(null);
   let loaded = 0, ready = false, failed = false, booted = false;
+  let idxS = -1, idxClock = 0;    // low-passed scrub index (jump-cut killer)
   let progress = 0;
   let W, H, dpr;
 
@@ -71,7 +74,21 @@
     for (let i = 1; i < FRAME_COUNT; i++) (i % 8 === 0 ? coarse : fine).push(i);
     await Promise.all(coarse.map(load));
     ready = true;
-    fine.reduce((p, i) => p.then(() => load(i)), Promise.resolve());
+    /* nearest-first fine fill: resolve the frames around where the visitor
+       actually is, not in file order -- a beat you rest on sharpens first */
+    const pending = new Set(fine);
+    (async () => {
+      while (pending.size) {
+        let best = -1, bd = 1e9;
+        const at = idxS < 0 ? 0 : idxS;
+        for (const i of pending) {
+          const d = Math.abs(i - at);
+          if (d < bd) { bd = d; best = i; }
+        }
+        pending.delete(best);
+        await load(best);
+      }
+    })();
   }
 
   function nearestFrame(idx) {
@@ -97,7 +114,16 @@
     if (alpha <= 0.001) return;
 
     const f = clamp01((p - SCRUB[0]) / (SCRUB[1] - SCRUB[0]));
-    const idx = Math.min(FRAME_COUNT - 1, Math.round(f * (FRAME_COUNT - 1)));
+    const idxT = Math.min(FRAME_COUNT - 1, Math.round(f * (FRAME_COUNT - 1)));
+    /* low-pass the drawn index: a wheel flick becomes a beat of fast-motion
+       playback instead of a 10-frame jump cut. Big jumps (deep links, snap
+       teleports) snap directly -- never play a fast-forward reel. */
+    const nowT = performance.now();
+    const dtS = Math.min(0.1, (nowT - (idxClock || nowT)) / 1000);
+    idxClock = nowT;
+    if (idxS < 0 || Math.abs(idxT - idxS) > 30) idxS = idxT;
+    else idxS += (idxT - idxS) * Math.min(1, dtS * 14);
+    const idx = Math.round(idxS);
     const img = nearestFrame(idx);
     if (!img) return;
 
@@ -158,6 +184,7 @@
   window.SEALFILM = {
     get ready() { return ready; },
     get failed() { return failed; },
+    arm() { boot(); },              // velocity lookahead / anchor-glide pre-boot
     setProgress(v) {
       progress = clamp01(v);
       if (!booted && progress > 0.22) boot();

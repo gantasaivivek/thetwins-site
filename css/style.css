@@ -783,7 +783,9 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   filter: blur(8px);
 }
 .vt .vw.on {
-  opacity: 1;
+  /* landed words breathe on the same --pulse heartbeat as the HUD corners
+     and the wordmark star (reduced motion never writes --pulse → static) */
+  opacity: calc(0.86 + 0.14 * var(--pulse, 1));
   transform: translateY(0) scale(1);
   filter: blur(0);
   transition: opacity 0.4s var(--ease-out), filter 0.45s var(--ease-out),

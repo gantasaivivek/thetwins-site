@@ -164,6 +164,20 @@
   let t0 = performance.now();
   let glow = 0, lastMode = null;
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* the exit decompression greets the visitor once: the swarm coalesces
+     through the heart, then releases to the idle halo (hover always wins) */
+  let _arrived = false;
+  window.FOOTERFX = {
+    arrive() {
+      if (_arrived || REDUCED) return;
+      _arrived = true;
+      if (mode === null) {
+        mode = 'MANIFESTO';
+        setTimeout(() => { if (mode === 'MANIFESTO') mode = null; }, 1500);
+      }
+    }
+  };
   function frame(now) {
     requestAnimationFrame(frame);
     if (!canvas.isConnected) return;

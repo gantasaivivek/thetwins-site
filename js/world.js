@@ -112,11 +112,15 @@ const skyMat = new THREE.ShaderMaterial({
     uSpace: { value: 0 }, uTime: { value: 0 },
     uHorizon: { value: HAZE }, uZenith: { value: ZENITH }, uSunDir: { value: SUN },
     uCosmos: { value: fallSpace },
-    uRange: { value: fallSpace }, uHasRange: { value: 0 }
+    uRange: { value: fallSpace }, uHasRange: { value: 0 },
+    uParhelion: { value: 0 },
+    /* the parhelion's own seat: dead ahead over the range (the camera faces
+       -z through the whole protocol act; the true SUN sits behind it) */
+    uParhDir: { value: new THREE.Vector3(0, 0.47, -1).normalize() }
   },
   vertexShader: `varying vec3 vDir;
     void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uSpace, uTime, uHasRange; uniform vec3 uHorizon, uZenith, uSunDir; uniform sampler2D uCosmos, uRange; varying vec3 vDir;
+  fragmentShader: `uniform float uSpace, uTime, uHasRange, uParhelion; uniform vec3 uHorizon, uZenith, uSunDir, uParhDir; uniform sampler2D uCosmos, uRange; varying vec3 vDir;
     float shash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float snoise(vec2 p){
       vec2 i = floor(p), f = fract(p);
@@ -170,6 +174,23 @@ const skyMat = new THREE.ShaderMaterial({
       float sunEase = 1.0 - panoW * 0.65;
       sky += vec3(0.28, 0.25, 0.20) * pow(sd, 7.0) * sunEase;
       sky += vec3(0.95, 0.88, 0.74) * pow(sd, 110.0) * 0.85 * sunEase;
+      // THE PARHELION — the sky answers the protocol: a faint 22-deg halo,
+      // two sun dogs where the halo crosses the sun's elevation, one thin
+      // light pillar. Procedural on the ONE true sun (the 4x-tiled pano
+      // could only ever repeat a baked halo four times around the circle).
+      // Champagne-silver — inside the ratified gold family, never a new hue.
+      if (uParhelion > 0.001) {
+        float ang = acos(clamp(dot(d, uParhDir), -1.0, 1.0));
+        float halo = exp(-pow((ang - 0.384) * 24.0, 2.0));
+        float dogs = halo * exp(-pow((d.y - uParhDir.y) * 7.0, 2.0)) * 1.7;
+        float azD = atan(d.z, d.x) - atan(uParhDir.z, uParhDir.x);
+        azD = abs(mod(azD + 3.14159265, 6.2831853) - 3.14159265);
+        float pillar = exp(-pow(azD * 22.0, 2.0))
+                     * (1.0 - smoothstep(0.05, 0.42, abs(d.y - uParhDir.y)));
+        sky += vec3(1.0, 0.965, 0.88)
+             * (halo * 0.17 + dogs * 0.17 + pillar * 0.11)
+             * uParhelion * (1.0 - panoW * 0.22);
+      }
       // cosmos arm kept for the (retired) space mode
       if (uSpace > 0.001) {
         vec2 uv = vec2(atan(d.z, d.x) / 6.2831853 + 0.5, asin(clamp(d.y, -1.0, 1.0)) / 3.14159265 + 0.5);
@@ -1758,31 +1779,34 @@ const moteGeo = new THREE.BufferGeometry();
 }
 const moteMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, depthTest: true,
-  uniforms: { uTime: { value: 0 } },
+  uniforms: { uTime: { value: 0 }, uWind: { value: 0 } },
   vertexShader: `
     attribute float aPhase; attribute float aSeed; attribute float aEnd;
-    uniform float uTime;
+    uniform float uTime, uWind;
     varying float vA;
     void main(){
       float W = 36.0, H = 9.0, D = 24.0;
       float fall = 1.1 + aSeed * 2.0;                       // per-flake fall speed
       float baseWind = 3.4 + aSeed * 2.6;                   // strong driving wind (wraps clean)
-      // bounded gust added AFTER the wrap so the drift stays seamless
-      float gust = sin(uTime*0.4 + aPhase*0.5)*1.0 + sin(uTime*0.17 + 1.7)*0.6;
+      // bounded gust added AFTER the wrap so the drift stays seamless;
+      // uWind (scroll velocity) drives gust + streak length ONLY — never the
+      // cumulative wrap term, which would teleport every flake on a flick
+      float gust = (sin(uTime*0.4 + aPhase*0.5)*1.0 + sin(uTime*0.17 + 1.7)*0.6)
+                 * (1.0 + 1.6*uWind);
       float x = mod(position.x + uTime*baseWind, W) - W*0.5;
       x += gust + sin(uTime*1.8 + aPhase)*0.2;
       float y = H - mod(position.y + uTime*fall, H);        // falls, wraps
       float z = (position.z - D*0.5) + sin(uTime*0.9 + aPhase*1.7)*0.25;
       // the tail vertex trails back along the velocity vector — a motion streak
       vec3 vel = vec3(baseWind + gust*0.6, -fall, 0.0);
-      vec3 p = vec3(x, y, z) - aEnd * vel * (0.035 + aSeed*0.03);
+      vec3 p = vec3(x, y, z) - aEnd * vel * (0.035 + aSeed*0.03) * (1.0 + 2.2*uWind);
       vec4 mv = viewMatrix * vec4(p, 1.0);
       gl_Position = projectionMatrix * mv;
       // fade at the top/bottom of the column so wrap seams are invisible;
       // the tail fades harder than the head so each streak has direction
       vA = (0.14 + 0.24*aSeed)
         * smoothstep(0.0, 0.9, y) * smoothstep(H, H-1.3, y)
-        * (1.0 - aEnd*0.7);
+        * (1.0 - aEnd*0.7) * (1.0 + 0.35*uWind);
     }`,
   fragmentShader: `
     varying float vA;
@@ -2601,8 +2625,12 @@ const telYr2 = document.querySelector('[data-tel="yr2"]');
 const HUD_SCRAMBLE_ELS = [
   ...document.querySelectorAll('.topnav a')
 ].filter(Boolean);
-const ACT_EDGES = [0.10, 0.28, 0.42, 0.62, 0.76, 0.88];
+/* 0.42 -> 0.40: the HUD re-stamp + ice-crack land at the seal film's
+   ENTRANCE (a scene change, where the grammar belongs), not mid-macro */
+const ACT_EDGES = [0.10, 0.28, 0.40, 0.62, 0.76, 0.88];
 let lastActIdx = -1;
+let _actStampT = 0, _actStampP = -1;   // act-crossing debounce (scrub dither)
+let _windK = 0, _nowTime = 0, _settleAt = -1e3;  // velocity weather + snap settle
 function actIndex(p) { let i = 0; for (const e of ACT_EDGES) if (p > e) i++; return i; }
 
 /* ---------------- annotation labels (leader lines) ---------------- */
@@ -2647,15 +2675,28 @@ function update(time) {
   const inCavern = P > 0.66;
   cavGroup.visible = P > 0.58;
 
-  window.SCORE?.setProgress(p);   // the score's harmony follows the descent
+  /* the score's harmony follows the STORY, not the frozen surface warp:
+     past 0.60 legacy p pins toward 0.955, which fired the FINALE chord at
+     the breach and left the ending nowhere to go. Hold the vault chord
+     (scoreP < 0.95, filter fully swelled) through the dive + cavern, and
+     give the finale to the vow at P = 0.955 — continuous at both joins. */
+  const scoreP = P <= 0.60 ? p
+    : P < 0.955 ? 0.9317 + ((P - 0.60) / 0.355) * 0.0182
+    : 0.95 + ((P - 0.955) / 0.045) * 0.05;
+  window.SCORE?.setProgress(scoreP);
 
   /* act-transition detector: scramble the whole HUD when we cross an edge */
   const ai = actIndex(p);
   if (ai !== lastActIdx) {
-    if (lastActIdx !== -1) {
+    /* debounced: scrub dither across an edge used to machine-gun the
+       re-stamp + ice-crack — one signature moment per crossing, with a
+       cooldown and a real-travel guard before it may fire again */
+    const nowA = performance.now() / 1000;
+    if (lastActIdx !== -1 && nowA - _actStampT > 1.2 && Math.abs(p - _actStampP) > 0.008) {
       HUD_SCRAMBLE_ELS.forEach(el => scrambleIn(el));
       window.SFX?.telemetry(3);          // the whole HUD re-stamps
       window.SOUNDWORLD?.crack(0.8);     // the ice answers the crossing
+      _actStampT = nowA; _actStampP = p;
     }
     lastActIdx = ai;
   }
@@ -2680,6 +2721,11 @@ function update(time) {
   lastGalaxy = 0;
   lastExplore = explore;
 
+  /* velocity weather — the world answers the hand: scroll speed leans on
+     the spindrift's gusts and streaks (capped so autoplay glides whisper) */
+  _nowTime = time;
+  _windK += ((Math.min(0.4, window.__scrollVel || 0) / 0.4) - _windK) * 0.08;
+  moteMat.uniforms.uWind.value = REDUCED ? 0 : _windK;
   moteMat.uniforms.uTime.value = time;
   sparkTime.value = time;
   for (const m of driftMats) m.uniforms.uTime.value = time % 3600.0;
@@ -2694,6 +2740,10 @@ function update(time) {
   skyMat.uniforms.uSpace.value = 0;
   /* long wrap so the stratus drift never visibly pops (float stays precise) */
   skyMat.uniforms.uTime.value = time % 3600.0;
+  /* THE PARHELION blooms as the protocol crystallizes, holds its peak
+     through the vault rise, and yields the sky to the breach film */
+  skyMat.uniforms.uParhelion.value =
+    seg(masterP, 0.36, 0.55) * (1 - seg(masterP, 0.60, 0.645));
   /* heavy haze IS the depth cue: the dune belts dissolve into the sky's own
      horizon colour — one world, no junction anywhere */
   scene.fog.density = 0.016;
@@ -2715,6 +2765,11 @@ function update(time) {
     + seg(p, 0.385, 0.403) * (1 - seg(p, 0.412, 0.432)) * 0.45
     /* the breach — the veil blinks as the ice opens and the dive begins */
     + seg(P, 0.596, 0.628) * (1 - seg(P, 0.64, 0.672)) * 0.8
+    /* the hidden camera cut (surface freeze -> cavern lens at 0.66) is only
+       ever safe under an opaque dive film; when the film is late or 404'd,
+       this frost blink covers the teleport — same pattern as the arrival */
+    + (window.DIVEFILM?.ready ? 0
+      : seg(P, 0.644, 0.658) * (1 - seg(P, 0.672, 0.692)) * 0.75)
     /* the arrival — retired while the cavern film carries the hand-off
        (film-to-film continues the very frame, so a veil would only smear
        it); the blink survives solely as the 404 fallback's softener, when
@@ -3072,7 +3127,10 @@ function update(time) {
   const moatVis = moat * moatFade;
   /* golden hour — scroll-reactive: the vault pulls the sun low and warm */
   {
-    const gold = smooth(moatVis);
+    /* anticipation: the key leans faintly warm while the facets sink
+       (p 0.80-0.86) — the dead beat before the vault calves gains a
+       direction using only light, no new object (subtraction wins) */
+    const gold = clamp01(smooth(moatVis) + 0.22 * seg(p, 0.80, 0.86) * moatFade);
     key.color.lerpColors(KEY_BASE, KEY_GOLD, gold * 0.85);
     key.intensity = 3.8 + 0.45 * gold;
     rim.color.lerpColors(RIM_BASE, RIM_GOLD, gold * 0.5);
@@ -3360,8 +3418,10 @@ function update(time) {
        into the oculus and the light takes the frame, clearing by P=1 so the
        resting frame is the godray, the vow and the name */
     /* rises only after the investors plate has fully cleared (0.968) */
-    const flash = seg(P, 0.960, 0.988) * (1 - seg(P, 0.99, 1.0));
-    whiteout.style.opacity = String(flash * 0.92);
+    /* the un-flash EXHALES over the last 0.015 instead of snapping off
+       inside the final 0.01 — the white releases into the godray rest */
+    const flash = seg(P, 0.960, 0.988) * (1 - seg(P, 0.985, 1.0));
+    whiteout.style.opacity = String(flash * 0.88);
   }
 
   /* camera — the surface line until the dive film covers the cut, then
@@ -3394,6 +3454,12 @@ function update(time) {
   }
   if (_introT >= 0 && _introT < 1) {
     _introT = Math.min(1, _introT + Math.min(0.05, Math.max(0.001, time - _introLastT)) / 3.2);
+    /* scroll RATCHETS the fall instead of fighting it: an impatient hand
+       used to rubber-band against the blend (scrub moved the camera, the
+       intro dragged it back); now scrolling completes the descent — the
+       camera dives faster to meet the visitor. Patient visitors see the
+       untouched 3.2s fall (masterP stays ~0). */
+    _introT = Math.max(_introT, smooth(clamp01(masterP / 0.03)));
     _introLastT = time;
     const ik = Math.pow(1 - _introT, 3);
     camPos.lerp(_introStart, ik);
@@ -3406,9 +3472,16 @@ function update(time) {
      Incommensurate sine pairs read as organic handheld drift, never a loop;
      REDUCED drops it so motion-sensitive visitors get a steady frame. */
   if (!REDUCED) {
-    camera.position.x += Math.sin(time * 0.23) * 0.05 + Math.sin(time * 0.071 + 1.7) * 0.035;
-    camera.position.y += Math.sin(time * 0.31 + 0.6) * 0.03 + Math.sin(time * 0.047) * 0.022;
-    camera.position.z += Math.sin(time * 0.17 + 3.1) * 0.035;
+    /* scroll speed leans on the lens like wind pressure (velocity weather) */
+    const bk = 1 + 0.5 * _windK;
+    camera.position.x += (Math.sin(time * 0.23) * 0.05 + Math.sin(time * 0.071 + 1.7) * 0.035) * bk;
+    camera.position.y += (Math.sin(time * 0.31 + 0.6) * 0.03 + Math.sin(time * 0.047) * 0.022) * bk;
+    camera.position.z += Math.sin(time * 0.17 + 3.1) * 0.035 * bk;
+    /* snap-arrival settle: one deep decaying exhale when a beat is reached */
+    const st = time - _settleAt;
+    if (st > 0 && st < 2.2) {
+      camera.position.y -= Math.exp(-st * 1.8) * 0.05 * Math.sin(st * 3.1);
+    }
   }
   camera.position.x += mouse.x * 0.18;
   camera.position.y += -mouse.y * 0.10;
@@ -3788,7 +3861,7 @@ if (__worldOK) {
   window.WORLD = { ready: true, setProgress(v) {
     masterP = clamp01(v);
     progress = warpLegacy(masterP);
-  } };
+  }, settle() { _settleAt = _nowTime; } };
   addEventListener('resize', fitToStage);
   tickLoop();
 

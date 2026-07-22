@@ -32,6 +32,7 @@
 
   const frames = new Array(FRAME_COUNT).fill(null);
   let loaded = 0, ready = false, failed = false, booted = false;
+  let idxS = -1, idxClock = 0;    // low-passed scrub index (jump-cut killer)
   let progress = 0;
   let W, H, dpr;
 
@@ -73,7 +74,21 @@
     for (let i = 1; i < FRAME_COUNT; i++) (i % 8 === 0 ? coarse : fine).push(i);
     await Promise.all(coarse.map(load));
     ready = true;
-    fine.reduce((p, i) => p.then(() => load(i)), Promise.resolve());
+    /* nearest-first fine fill: resolve the frames around where the visitor
+       actually is, not in file order -- a beat you rest on sharpens first */
+    const pending = new Set(fine);
+    (async () => {
+      while (pending.size) {
+        let best = -1, bd = 1e9;
+        const at = idxS < 0 ? 0 : idxS;
+        for (const i of pending) {
+          const d = Math.abs(i - at);
+          if (d < bd) { bd = d; best = i; }
+        }
+        pending.delete(best);
+        await load(best);
+      }
+    })();
   }
 
   function nearestFrame(idx) {
@@ -101,7 +116,16 @@
     // true cover-fit — the cavern is a symmetric centered interior, so a
     // full cover crop is safe on every aspect (the heart stays centered)
     const f = clamp01((p - SCRUB[0]) / (SCRUB[1] - SCRUB[0]));
-    const idx = Math.min(FRAME_COUNT - 1, Math.round(f * (FRAME_COUNT - 1)));
+    const idxT = Math.min(FRAME_COUNT - 1, Math.round(f * (FRAME_COUNT - 1)));
+    /* low-pass the drawn index: a wheel flick becomes a beat of fast-motion
+       playback instead of a 10-frame jump cut. Big jumps (deep links, snap
+       teleports) snap directly -- never play a fast-forward reel. */
+    const nowT = performance.now();
+    const dtS = Math.min(0.1, (nowT - (idxClock || nowT)) / 1000);
+    idxClock = nowT;
+    if (idxS < 0 || Math.abs(idxT - idxS) > 30) idxS = idxT;
+    else idxS += (idxT - idxS) * Math.min(1, dtS * 14);
+    const idx = Math.round(idxS);
     const img = nearestFrame(idx);
     if (!img) return;
 
@@ -147,6 +171,7 @@
   window.CAVERNFILM = {
     get ready() { return ready; },
     get failed() { return failed; },
+    arm() { boot(); },              // velocity lookahead / anchor-glide pre-boot
     setProgress(v) {
       progress = clamp01(v);
       if (!booted && progress > 0.60) boot();

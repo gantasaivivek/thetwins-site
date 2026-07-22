@@ -142,7 +142,10 @@
       const eb = $('.hero-eyebrow'); if (eb) eb.style.visibility = 'visible';
       return;
     }
-    window.__enterWorld = true;   /* the world's entrance descent (world.js) */
+    /* THE FALL: if the entry film armed in time it carries the descent and
+       lands on the live frame; otherwise the live camera fall runs as ever */
+    if (!(window.ENTRYFILM && window.ENTRYFILM.play()))
+      window.__enterWorld = true;   /* the world's entrance descent (world.js) */
     gsap.to('#topbar', { opacity: 1, duration: 1, ease: 'power2.out' });
     /* the HUD scrambles at once on arrival (igloo move) — but NOT the sound
        toggle: it carries live state (SOUND: ON/OFF) and scrambling would cache
@@ -217,7 +220,10 @@
   // stations — the throat of the dive, the heart, the specs wall, the seal
   /* 0.705 (not 0.695) — the dive's dwell station must rest on a luminous
      frame, not the darkest one; 0.952 — the investor ask gets its own rest */
-  const SNAPS = [0, L(0.09), L(0.27), L(0.36), L(0.53), L(0.70), L(0.91),
+  /* L(0.486): the signature's own rest — the film that carries the vow had
+     NO station between 0.232 and 0.341 and was glided straight through;
+     the dwell lands on the settled seal, ring and gold script fully lit */
+  const SNAPS = [0, L(0.09), L(0.27), L(0.36), L(0.486), L(0.53), L(0.70), L(0.91),
                  0.705, 0.80, 0.865, 0.925, 0.952, 1];
 
   function cardAlpha(p, c) {
@@ -250,7 +256,11 @@
       const p = warpLegacy(P);                 // legacy-authored beats read this
       /* the narrator: legacy scenes carry the surface acts, the vault line
          holds through the dive + cavern, the vow speaks at the true finale */
-      const storyP = P <= LEGACY_END ? p : (P < 0.955 ? 0.94 : Math.min(1.0, P));
+      /* a continuous ramp, not a frozen pin — same 'vault' scene resolves
+         throughout, but the story position keeps moving under the ice */
+      const storyP = P <= LEGACY_END ? p
+        : (P < 0.955 ? 0.94 + ((P - LEGACY_END) / (0.955 - LEGACY_END)) * 0.0149
+        : Math.min(1.0, P));
       proxy.p = storyP;
 
       window.SCENE_NARRATE?.(storyP);
@@ -278,6 +288,21 @@
         window.DIVEFILM?.setProgress(P);    // the descent film (master-authored)
         window.CAVERNFILM?.setProgress(P);  // the arrival film (chained from the dive tail)
         window.SOUNDWORLD?.setProgress(P);  // the sound world rides the dive
+        /* velocity lookahead: a fast hand arms films BEFORE their windows so
+           a flick never lands on a held/low-res proxy frame (arm() no-ops
+           once booted; slow readers keep the lazy thresholds untouched) */
+        const vP = Math.abs(self.getVelocity()) / Math.max(1, self.end - self.start);
+        window.__scrollVel = vP;            // the weather reads the hand (world.js)
+        /* snap-arrival settle: the first frame at rest on a beat gets one
+           decaying camera exhale — an ARRIVAL, not merely a stop */
+        const nearSnap = SNAPS.some(sn => Math.abs(P - sn) < 0.002);
+        if (nearSnap && vP < 0.004 && !window.__atRest) {
+          window.__atRest = true; window.WORLD?.settle?.();
+        } else if (!nearSnap || vP > 0.02) window.__atRest = false;
+        const horizon = P + Math.min(0.35, Math.max(0.03, vP * 1.2));
+        if (horizon > 0.25) window.SEALFILM?.arm?.();
+        if (horizon > 0.58) { window.VAULTFILM?.arm?.(); window.DIVEFILM?.arm?.(); }
+        if (horizon > 0.75) window.CAVERNFILM?.arm?.();
         window.__scrollP = 0.06;
       } else {
         window.HERO?.setProgress(p);
@@ -314,7 +339,23 @@
       } else {
         const lat = (58.3019 - P * 12.4).toFixed(4);
         const lon = (134.4197 + P * 22.7).toFixed(4);
-        hudCoords.textContent = `${lat}° N — ${lon}° W`;
+        let txt = `${lat}° N — ${lon}° W`;
+        /* LOCK LOST — the instrument loses satellite fix as the ice closes
+           over it (P 0.570→0.586), and TEMPORAL DRIFT resolves out of the
+           static. Pure-P and deterministic, so scroll-back heals it
+           symmetrically; reduced motion keeps clean coordinates. */
+        const lost = reduced ? 0 : gsap.utils.clamp(0, 1, (P - 0.570) / 0.016);
+        if (lost > 0) {
+          const GL = '#/|+*<>~';
+          const step = Math.floor(P * 4000);
+          let out = '';
+          for (let i = 0; i < txt.length; i++) {
+            const h = Math.sin(i * 127.1 + step * 311.7) * 43758.5453;
+            out += (h - Math.floor(h)) < lost * 0.7 ? GL[(i + step) % GL.length] : txt[i];
+          }
+          txt = out;
+        }
+        hudCoords.textContent = txt;
       }
 
       /* THE VOW — the ending title card. Words land over the white bloom as
@@ -407,6 +448,7 @@
   ['wheel', 'touchstart', 'pointerdown'].forEach(ev =>
     addEventListener(ev, () => {
       userMoved = true;
+      window.ENTRYFILM?.skip?.();     // a scroll completes the fall, fast
       if (autoOn) stopAuto();
       else if (autoTween) { autoTween.kill(); autoTween = null; }
     }, { passive: true }));
@@ -523,7 +565,43 @@
      visitor scrolls back in. In world mode all content lives inside the
      film, so the boundary is the footer; the no-WebGL fallback keeps the
      reading deck and bounds at #world. Created once the mode is known. */
-  function makeBoundary(sel) { ScrollTrigger.create({
+  function makeBoundary(sel) {
+    /* THE RETURN TO THE SURFACE — in world mode the film's resting light
+       hands the page over through a SCRUBBED decompression, not a cut:
+       the vow steps aside, the HUD exhales, the reading deck rises into
+       place and the relic swarm greets the visitor. (sel === '#footer'
+       only ever happens in world mode, non-reduced — see the call site;
+       the reduced/no-WebGL '#world' boundary keeps the tween pair.) */
+    if (sel === '#footer') {
+      const grid = document.querySelector('.footer-grid');
+      let greeted = false;
+      ScrollTrigger.create({
+        trigger: sel, start: 'top bottom', end: 'top 35%', scrub: true,
+        onUpdate(self) {
+          const k = self.progress;
+          if (vowEl && vowShown) {
+            vowEl.style.visibility = k > 0.97 ? 'hidden' : 'visible';
+            vowEl.style.opacity = String(Math.max(0, 1 - k * 1.6));
+            vowEl.style.transform = `translateY(${(-k * 24).toFixed(1)}px)`;
+          }
+          const hudK = Math.max(0, 1 - k * 1.4);
+          gsap.set('.hud-coords, .hud-progress', { opacity: 0.92 * hudK });
+          if (k <= 0.001) gsap.set('.hud-corner', { clearProps: 'opacity' });
+          else gsap.set('.hud-corner', { opacity: 0.55 * hudK });
+          gsap.set('.hud-sound', { opacity: 0.92 - k * 0.07 });
+          if (grid) {
+            grid.style.opacity = String(Math.min(1, 0.15 + k * 1.1));
+            grid.style.transform = `translateY(${((1 - k) * 5).toFixed(2)}vh)`;
+            /* the film's light visibly hands over: the deck arrives bright
+               and settles to its own key */
+            grid.style.filter = k < 0.995 ? `brightness(${(1.30 - k * 0.30).toFixed(3)})` : 'none';
+          }
+          if (k > 0.4 && !greeted) { greeted = true; window.FOOTERFX?.arrive?.(); }
+        }
+      });
+      return;
+    }
+    ScrollTrigger.create({
     trigger: sel,
     start: 'top 88%',
     onEnter() {
@@ -611,8 +689,10 @@
     { key: 'enter',    a: -1,    b: 0.03 },   // arrival — the world of the human
     { key: 'human',    a: 0.03,  b: 0.15 },   // one figure, the beating heart
     { key: 'twin',     a: 0.15,  b: 0.30 },   // the digital twin wakes beside you
-    { key: 'verified', a: 0.30,  b: 0.45 },   // authorized services sign in via the twin
-    { key: 'protocol', a: 0.45,  b: 0.82 },   // the five facets orbit the pair
+    { key: 'verified', a: 0.30,  b: 0.52 },   // authorized services sign in via the twin
+    /* the protocol line now begins AFTER the seal film exits (0.522) — the
+       voice used to describe facets over the still-opaque signature macro */
+    { key: 'protocol', a: 0.52,  b: 0.82 },   // the five facets orbit the pair
     { key: 'vault',    a: 0.82,  b: 0.955 },  // the heart, sealed in the ice
     { key: 'vow',      a: 0.955, b: 1.01 }    // the whiteout vow
   ];
@@ -892,6 +972,10 @@
       if (inworld && (FILM_ANCHORS[href] !== undefined || a.classList.contains('skip-link'))) {
         e.preventDefault();
         try { stopAuto(); } catch (_) { /* not armed yet */ }
+        /* deep glides cross film windows — arm everything on the route so
+           the destination beat is sharp on arrival */
+        window.SEALFILM?.arm?.(); window.VAULTFILM?.arm?.();
+        window.DIVEFILM?.arm?.(); window.CAVERNFILM?.arm?.();
         if (a.classList.contains('skip-link')) {
           const y = $('#footer').getBoundingClientRect().top + scrollY;
           window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
@@ -1082,6 +1166,9 @@
       const stage = () => {
         if (!(window.WORLD && window.WORLD.ready)) { setTimeout(stage, 200); return; }
         stopAuto();
+        /* enterHero re-arms autoplay ~2.6s later, which then drove the HUD
+           over the staged frame — a frozen capture must stay frozen */
+        window.__startAuto = () => {};
         const l = document.getElementById('loader');
         if (l) l.style.display = 'none';
         const sh = document.getElementById('sound-hint');
