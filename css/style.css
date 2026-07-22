@@ -18,60 +18,45 @@
   font-style: normal;
   font-display: swap;
 }
-/* the display voice — Instrument Serif: an elegant high-contrast serif for
-   THE TWINS and every ceremonial line, forged to read as platinum */
+/* the wordmark voice — Trajan-class engraved Roman capitals (variable 400–900),
+   used ONLY for THE TWINS title so it stands as the brand against the mono HUD */
 @font-face {
-  font-family: 'Instrument Serif';
-  src: url('../assets/fonts/InstrumentSerif-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-/* the body/UI voice — Inter (variable 400–600): clean, modern, high legibility
-   for prose and interface, leaving mono to the instrument labels */
-@font-face {
-  font-family: 'Inter';
-  src: url('../assets/fonts/Inter-Var.woff2') format('woff2');
-  font-weight: 400 600;
+  font-family: 'Cinzel';
+  src: url('../assets/fonts/Cinzel-Var.woff2') format('woff2');
+  font-weight: 400 900;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  /* ---- PLATINUM + GOLD ON ICE (locked palette, 2026-07) ----
-     Dominant metal platinum, champagne-gold edges only, crystalline ice
-     atmosphere. The one red (the human heart) lives in world.js, untouched. */
-  --bg: #E4ECF2;                /* background void — light ice */
-  --bg-deep: #33434e;           /* deep ice shadow, for dark surfaces/ink grounds */
-  --slate: #6B8FA3;             /* deep ice shadow — mid arctic blue */
-  --slate-dark: #33434e;        /* INK: deep arctic slate — AA/AAA on the ice (~8:1) */
-  --platinum: #E8E6E3;          /* dominant metal — body & large display fills */
-  --platinum-brushed: #C9C7C3;  /* secondary brushed-platinum surfaces */
-  --ice-light: #F7F9FB;         /* pure ice white — highlights, selection */
-  --ice-blue: #C4D6E4;          /* light arctic blue */
-  --ice-mist: #D7DEE7;          /* frosted mist */
-  --silver: #C9C7C3;            /* brushed platinum (never pure silver) */
-  --periwinkle: #A8C0D4;        /* soft arctic blue */
-  /* the accent metal — soft champagne gold, edges & marks only, never a fill;
-     deep gold for thin highlights; a darker champagne ink where text must pass AA */
-  --gold: #C9A86C;              /* soft champagne gold — edges, accents, pulse */
-  --gold-bright: #D4B87A;       /* the twin's pulse gold — a lighter champagne */
-  --gold-deep: #A88B4A;         /* deep gold — thin highlights only */
-  --gold-ink: #856A2C;          /* champagne TEXT on light glass — AA-safe (~4.8:1) */
-  --gold-glow: rgba(201, 168, 108, 0.55);
+  --bg: #A0A5B1;
+  --bg-deep: #23262c;
+  --slate: #6a6f7d;
+  --slate-dark: #4c4f53;
+  --ice-light: #e1e6f1;
+  --ice-blue: #d1e3ff;
+  --ice-mist: #d1d6e3;
+  --silver: #afb6c7;
+  --periwinkle: #a7b2d6;
+  /* the sovereign metals — antique gold ink on the bright world; used ONLY
+     as hairlines, marks and interpuncts, never as fills */
+  --gold: #a5741f;
+  --gold-bright: #c9974a;
+  --gold-ink: #8a6014;          /* gold TEXT on light glass — AA-safe */
+  --gold-glow: rgba(201, 151, 74, 0.55);
   /* motion tokens — strong curves for entrances/landings; built-in `ease`
      deliberately stays for hover/colour changes */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in: cubic-bezier(0.55, 0.06, 0.68, 0.19); /* exits: settle-in, ~60-70% of the enter */
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-spring: cubic-bezier(0.2, 1.4, 0.3, 1);   /* the vow's landing curve */
-  --sky-glow: #C4DCEC;          /* soft arctic sky glow */
-  --amber: #C9A86C;             /* retired warm amber → champagne gold */
-  --ink: #33434e;               /* deep arctic slate — primary text */
+  --sky-glow: #b5d5ff;
+  --amber: #cda05e;
+  --ink: #4c4f53;
 
   /* animated at runtime by the scroll timeline */
-  --hud-color: #33434e;
-  --hairline: rgba(51, 67, 78, 0.32);
+  --hud-color: #4c4f53;
+  --hairline: rgba(76, 79, 83, 0.35);
 
   /* Glow UI — the live heartbeat from the 3D world (0..1 lub-dub),
      written per-frame by world.js; the HUD frame breathes with it */
@@ -88,7 +73,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
   background-color: var(--bg);
   color: var(--ink);
   overflow-x: hidden;
@@ -132,19 +117,10 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .topnav a, .footer-links a, .footer-col a, .footer-col-head, .footer-tag, .footer-meta,
 .auth-eyebrow, .auth-title, .auth-meta, .app-sector .sec-head, .app-chip .app-name,
 .hud-coords, .hud-progress, .scroll-cue span, .wordmark {
-  /* the instrument voice stays mono now that <body> is Inter — these labels
-     used to inherit mono from the body font */
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-/* telemetry / coordinate readouts that live outside the label rule keep the
-   instrument voice too */
-.anno-tel, .block-tel, .plate-index, .decl em, .cta-mail,
-.credit-head, .footer-credits span, .loader-pct, .hud-corner {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 /* ============================================================
@@ -372,20 +348,13 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   transform: translate(-50%, -50%);
   width: 100%;
   height: 1em;
-  /* the display voice — Instrument Serif at its true weight, FORGED FROM
-     PLATINUM: a light liquid-metal fill, a delicate champagne-gold edge, and
-     a soft arctic-slate halo so the platinum reads over the bright range */
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
-  font-size: clamp(42px, 9.6vw, 124px);
-  font-weight: 400;
-  letter-spacing: 0.04em;
+  /* the one serif on the site — engraved Roman capitals, echoing the logo */
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: clamp(38px, 9vw, 116px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
   line-height: 1;
-  color: #E6E4E0;
-  -webkit-text-stroke: 0.6px rgba(168, 139, 74, 0.5);   /* delicate gold edge */
-  text-shadow:
-    0 1px 0 rgba(201, 168, 108, 0.45),    /* champagne base-edge highlight */
-    0 3px 24px rgba(45, 58, 68, 0.55),    /* soft dark halo — legibility on bright sky */
-    0 1px 4px rgba(45, 58, 68, 0.5);
+  color: var(--slate-dark);
 }
 .hero-title .ht-word {
   position: absolute;
@@ -471,7 +440,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   left: 0;
   width: min(320px, 84vw);
   padding: 18px 20px 15px;
-  color: #34444e;
+  color: #2b3038;
   /* frosted instrument panel — a KEPT object, like the vault's platinum:
      glass, a gold hairline at the crown, and a quiet shadow for seating */
   background: linear-gradient(168deg, rgba(246, 249, 253, 0.6), rgba(233, 238, 246, 0.34));
@@ -491,14 +460,14 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   color: var(--gold-ink); opacity: 1; margin-bottom: 10px; }
 .anno h2 {
   /* the display voice — the same engraved capitals as THE TWINS itself */
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 17px;
   font-weight: 640;
   letter-spacing: 0.09em;
   line-height: 1.35;
   margin-bottom: 9px;
   text-transform: uppercase;
-  color: #2b3a44;
+  color: #23272e;
 }
 .anno p {
   font-size: 11.5px;
@@ -555,7 +524,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  color: #34444e;
+  color: #2b3038;
   text-shadow: none;
   padding: 8px 10px;
   border-left: 1px solid transparent;
@@ -577,7 +546,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 .star-label.block-label.hot .block-tel { display: block; }
 .star-label.block-label .star-tag {
-  color: #34444e;
+  color: #2b3038;
   border-color: rgba(43, 48, 56, 0.45);
   /* out of LAYOUT at rest, not just invisible — otherwise the hidden tag
      inflates offsetWidth and the resting code centres ~34px off its block */
@@ -614,8 +583,8 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .star-label .star-tag {
   font-size: 9px;
   letter-spacing: 0.1em;
-  color: #856A2C;
-  border: 1px solid rgba(201, 168, 108, 0.45);
+  color: #8a6014;
+  border: 1px solid rgba(165, 116, 31, 0.45);
   border-radius: 2px;
   padding: 1px 5px;
   opacity: 0;                       /* only the hovered / authorizing star shows it */
@@ -649,7 +618,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 /* both lines carry the same frost scrim as the .anno cards so they seat on
    the bright ice instead of floating low-contrast (jury round 10) */
 .auth-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #47505c; margin-bottom: 5px; text-shadow: 0 0 10px rgba(238, 243, 250, 0.9); }
-.auth-title { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: #2b3a44; line-height: 1.3; text-shadow: 0 0 12px rgba(238, 243, 250, 0.85); }
+.auth-title { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: #23272e; line-height: 1.3; text-shadow: 0 0 12px rgba(238, 243, 250, 0.85); }
 .auth-head { margin-bottom: 1px; }
 .auth-meta {
   align-self: stretch; margin-top: 3px; padding-top: 9px;
@@ -744,7 +713,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   opacity: 0;
 }
 #leaders circle {
-  fill: #34444e;
+  fill: #2b3038;
   opacity: 0;
 }
 
@@ -797,7 +766,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   visibility: hidden;
 }
 .vt {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(18px, 2.7vw, 38px);
   font-weight: 640;
   letter-spacing: 0.2em;
@@ -857,7 +826,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   background: linear-gradient(168deg, rgba(246, 249, 253, 0.65), rgba(233, 238, 246, 0.4));
   -webkit-backdrop-filter: blur(9px);
   backdrop-filter: blur(9px);
-  border: 1px solid rgba(201, 168, 108, 0.4);
+  border: 1px solid rgba(201, 151, 74, 0.4);
   border-radius: 999px;
   cursor: pointer;
   opacity: 0;
@@ -870,7 +839,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
               border-color 0.3s ease, visibility 0s linear 0.45s;
 }
 .claim-cta.on { opacity: 1; pointer-events: auto; transform: translateX(-50%); visibility: visible; transition-delay: 0s; }
-.claim-cta:hover { border-color: var(--gold-bright); color: #2b3a44; }
+.claim-cta:hover { border-color: var(--gold-bright); color: #23272e; }
 /* house 44px touch inflation (the ::before pattern) — invisible, position:fixed contains it */
 .claim-cta::before { content: ''; position: absolute; inset: -8px -10px; }
 .claim-dot { color: var(--gold-bright); font-size: 12px; }
@@ -915,7 +884,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   border-top: 1px solid var(--gold-glow);
   border-radius: 2px;
   box-shadow: 0 30px 80px rgba(35, 38, 44, 0.22);
-  color: #34444e;
+  color: #2b3038;
 }
 .claim-eyebrow {
   font-size: 10px;
@@ -924,7 +893,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   margin-bottom: 12px;
 }
 .claim-panel h3 {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 20px;
   font-weight: 640;
   letter-spacing: 0.06em;
@@ -965,7 +934,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   font-size: 16px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #2b3a44;
+  color: #23272e;
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(43, 48, 56, 0.35);
@@ -1006,12 +975,12 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   touch-action: manipulation;
   transition: background 0.3s ease, color 0.3s ease, transform 160ms var(--ease-out);
 }
-.claim-seal:hover { background: rgba(201, 168, 108, 0.14); color: #2b3a44; }
+.claim-seal:hover { background: rgba(201, 151, 74, 0.14); color: #23272e; }
 .claim-seal::before { content: ''; position: absolute; inset: -8px -10px; }  /* house 44px inflation */
 /* the sealed beat — one gold flare inside the panel before it hands off to the engraving */
 .claim-seal.sealed {
-  background: rgba(201, 168, 108, 0.14);
-  color: #2b3a44;
+  background: rgba(201, 151, 74, 0.14);
+  color: #23272e;
   border-color: var(--gold-bright);
   box-shadow: 0 0 18px var(--gold-glow);
   transition: box-shadow 0.45s var(--ease-out), background 0.3s ease;
@@ -1057,7 +1026,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   left: 0;
   top: 0;
   z-index: 33;                          /* over the finale film, under the HUD */
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(12px, 1.45vw, 19px);
   font-weight: 620;
   letter-spacing: 0.22em;
@@ -1159,14 +1128,14 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .specs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: 1px solid rgba(51, 67, 78, 0.22);
-  border-left: 1px solid rgba(51, 67, 78, 0.22);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
+  border-left: 1px solid rgba(76, 79, 83, 0.22);
 }
 .spec {
   position: relative;
   padding: 34px 26px 30px;
-  border-right: 1px solid rgba(51, 67, 78, 0.22);
-  border-bottom: 1px solid rgba(51, 67, 78, 0.22);
+  border-right: 1px solid rgba(76, 79, 83, 0.22);
+  border-bottom: 1px solid rgba(76, 79, 83, 0.22);
   transition: background 0.5s ease;
 }
 /* instrument cell wakes under the hand — hairline sharpens, a cold light
@@ -1222,7 +1191,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   width: 1px;
   height: clamp(50px, 9vh, 90px);
   transform: translateX(-50%);
-  background: linear-gradient(180deg, transparent, rgba(51, 67, 78, 0.4));
+  background: linear-gradient(180deg, transparent, rgba(76, 79, 83, 0.4));
 }
 .manifesto-eyebrow { opacity: 0.65; margin-bottom: 40px; }
 .manifesto-text {
@@ -1246,7 +1215,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 #manifesto.lit .manifesto-text .accent { background-size: 100% 1px; }
 .manifesto-sig {
   margin-top: 52px;
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(14px, 1.8vw, 19px);
   font-weight: 620;
   letter-spacing: 0.18em;
@@ -1261,7 +1230,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   position: relative;
   z-index: 2;
   color: var(--slate-dark);
-  border-top: 1px solid rgba(51, 67, 78, 0.22);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
   padding: clamp(220px, 34vh, 320px) clamp(20px, 6vw, 80px) 130px;
   overflow: hidden;
   /* the bright finale — the descent ends in light, not dark */
@@ -1316,7 +1285,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 .footer-soon em {
   font-style: normal; font-size: 7.5px; letter-spacing: 0.16em;
-  padding: 1px 5px; border: 1px solid rgba(51, 67, 78, 0.3); border-radius: 3px;
+  padding: 1px 5px; border: 1px solid rgba(76, 79, 83, 0.3); border-radius: 3px;
   opacity: 0.7;
 }
 
@@ -1333,7 +1302,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(51, 67, 78, 0.28);
+  border: 1px solid rgba(76, 79, 83, 0.28);
   border-radius: 4px;
   color: var(--slate-dark);
   opacity: 0.65;
@@ -1347,7 +1316,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .social svg { width: 16px; height: 16px; fill: currentColor; display: block; }
 .social:hover {
   opacity: 1;
-  border-color: rgba(51, 67, 78, 0.6);
+  border-color: rgba(76, 79, 83, 0.6);
 }
 /* hover MOVEMENT only for real pointers — touch taps leave sticky false
    hovers, and a stuck levitation reads as state corruption */
@@ -1376,7 +1345,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   gap: 5px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(51, 67, 78, 0.18);
+  border-top: 1px solid rgba(76, 79, 83, 0.18);
 }
 .footer-credits .credit-head {
   font-weight: 500;
@@ -1385,7 +1354,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 /* the vow — the finalized tagline closes the page at full voice */
 .footer-vow {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 13px;
   font-weight: 640;
   letter-spacing: 0.2em;
@@ -1434,7 +1403,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   z-index: 90;
   width: 22px;
   height: 22px;
-  border: 1px solid rgba(51, 67, 78, 0.5);
+  border: 1px solid rgba(76, 79, 83, 0.5);
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
@@ -1450,11 +1419,11 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   width: 2px; height: 2px;
   margin: -1px 0 0 -1px;
   border-radius: 50%;
-  background: rgba(51, 67, 78, 0.65);
+  background: rgba(76, 79, 83, 0.65);
 }
 #cursor-ring.hot {
   scale: 1.727;                      /* 22px -> ~38px, centred by origin */
-  border-color: rgba(51, 67, 78, 0.85);
+  border-color: rgba(76, 79, 83, 0.85);
 }
 @media (pointer: coarse) {
   #cursor-ring { display: none; }    /* no aura on touch, ever */
@@ -1562,7 +1531,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--slate-dark);
-  border: 1px solid rgba(51, 67, 78, 0.35);
+  border: 1px solid rgba(76, 79, 83, 0.35);
   border-radius: 2px;
   white-space: nowrap;               /* the label is one line, always */
   align-self: flex-end;
@@ -1572,16 +1541,16 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 /* RATIFIED 2026-07: the signal is GOLD — the CTA breathes the twin's coin,
    not the retired cyan */
 .cta-enter:hover {
-  border-color: #C9A86C;
-  box-shadow: 0 0 22px rgba(201, 168, 108, 0.25);
+  border-color: #d9a84e;
+  box-shadow: 0 0 22px rgba(217, 168, 78, 0.25);
 }
 .cta-enter .cta-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #C9A86C;
+  background: #d9a84e;
   opacity: calc(0.4 + 0.6 * var(--pulse, 0));
-  box-shadow: 0 0 8px rgba(201, 168, 108, 0.8);
+  box-shadow: 0 0 8px rgba(217, 168, 78, 0.8);
 }
 .cta-mail {
   font-size: 10px;
@@ -1601,7 +1570,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   padding: clamp(90px, 14vh, 160px) clamp(20px, 6vw, 80px) clamp(70px, 10vh, 120px);
   color: var(--slate-dark);
   background: radial-gradient(1100px 480px at 50% -8%, rgba(238, 243, 250, 0.45), transparent 68%);
-  border-top: 1px solid rgba(51, 67, 78, 0.22);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
 }
 .world-head, .pilot-head, .inv-head {
   font-size: 11px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
@@ -1624,7 +1593,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 @media (max-width: 760px) { .world-grid, .phases { grid-template-columns: 1fr; } }
 .being, .phase {
-  border-top: 1px solid rgba(51, 67, 78, 0.22);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
   padding-top: 18px;
 }
 .being-index, .phase-index {
@@ -1634,7 +1603,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   margin-bottom: 12px;
 }
 .being h3, .phase h3 {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 17px; font-weight: 640; letter-spacing: 0.08em; text-transform: uppercase;
   margin-bottom: 10px;
 }
@@ -1656,12 +1625,12 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .ladder {
   list-style: none;
   max-width: 46em;
-  border-top: 1px solid rgba(51, 67, 78, 0.22);
+  border-top: 1px solid rgba(76, 79, 83, 0.22);
 }
 .ladder li {
   display: flex; gap: 18px; align-items: baseline;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(51, 67, 78, 0.14);
+  border-bottom: 1px solid rgba(76, 79, 83, 0.14);
   font-size: 12.5px; line-height: 1.65;
 }
 .ladder li em {
@@ -1693,7 +1662,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   left: 0;
   width: min(360px, 86vw);
   padding: 20px 22px 18px;
-  color: #34444e;
+  color: #2b3038;
   /* the glass must GUARANTEE its own contrast — over the chamber's brightest
      wall the old 0.62/0.36 panel let the claims wash to near-invisible */
   background: linear-gradient(168deg, rgba(246, 249, 253, 0.90), rgba(233, 238, 246, 0.74));
@@ -1716,14 +1685,14 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   margin-bottom: 10px;
 }
 .plate h2 {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 18px;
   font-weight: 640;
   letter-spacing: 0.09em;
   line-height: 1.35;
   margin-bottom: 11px;
   text-transform: uppercase;
-  color: #2b3a44;
+  color: #23272e;
 }
 .plate p {
   font-size: 11.5px;
@@ -1748,10 +1717,10 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 .pspec { display: flex; flex-direction: column; }
 .pspec .pcount {
-  font-family: 'Instrument Serif', 'Times New Roman', Times, serif;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: 30px;
   font-weight: 640;
-  color: #2b3a44;
+  color: #23272e;
   font-variant-numeric: tabular-nums;
   display: inline-block;
 }
@@ -1811,7 +1780,7 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 }
 .decl em {
   font-style: normal;
-  color: #856A2C;                    /* holds over the bloom, unlike bright gold */
+  color: #8a6014;                    /* holds over the bloom, unlike bright gold */
   font-weight: 600;
   font-size: 10px;
   letter-spacing: 0.16em;
