@@ -142,6 +142,7 @@
       const eb = $('.hero-eyebrow'); if (eb) eb.style.visibility = 'visible';
       return;
     }
+    window.__enterWorld = true;   /* the world's entrance descent (world.js) */
     gsap.to('#topbar', { opacity: 1, duration: 1, ease: 'power2.out' });
     /* the HUD scrambles at once on arrival (igloo move) — but NOT the sound
        toggle: it carries live state (SOUND: ON/OFF) and scrambling would cache

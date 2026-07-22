@@ -3387,6 +3387,17 @@ function update(time) {
       if (fk > 1.001) camPos.sub(camLook).multiplyScalar(fk).add(camLook);
     }
   }
+  if (window.__enterWorld) {
+    window.__enterWorld = false;
+    if (!REDUCED && masterP < 0.03 && !_fzMode) { _introT = 0; _introLastT = time; }
+  }
+  if (_introT >= 0 && _introT < 1) {
+    _introT = Math.min(1, _introT + Math.min(0.05, Math.max(0.001, time - _introLastT)) / 3.2);
+    _introLastT = time;
+    const ik = Math.pow(1 - _introT, 3);
+    camPos.lerp(_introStart, ik);
+    camLook.lerp(_introLook, ik);
+  }
   mouse.x += (mouse.tx - mouse.x) * 0.04;
   mouse.y += (mouse.ty - mouse.y) * 0.04;
   camera.position.copy(camPos);
@@ -3657,6 +3668,15 @@ const _probePx = new Uint8Array(4);
    consecutive checks forces a context loss; the guarded recovery below
    reloads ONCE, and the fresh session re-rolls a clean compile. */
 let _fsFrame = 0, _fsStrikes = 0, _fsDone = false, _fsLastBlack = -1;
+/* THE ENTRANCE — the film FALLS to its opening frame: a one-shot descent
+   from altitude that lands exactly on the hero camera as the title
+   strikes. Pure blend-out — at t=1 the scroll camera owns the lens
+   unchanged. Skipped for reduced motion, deep restores and the freeze
+   harness. */
+let _introT = -1, _introLastT = 0;
+const _introStart = new THREE.Vector3(9, 26, 30);
+const _introLook = new THREE.Vector3(0, 3.2, 0);
+const _fzMode = new URLSearchParams(location.search).has('freeze');
 const _fsPx = new Uint8Array(4);
 function probeFrame() {
   if (_fsDone || !figureLoaded || masterP > 0.55 || masterP < 0.02) return;
