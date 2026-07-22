@@ -223,7 +223,9 @@
   /* L(0.486): the signature's own rest — the film that carries the vow had
      NO station between 0.232 and 0.341 and was glided straight through;
      the dwell lands on the settled seal, ring and gold script fully lit */
-  const SNAPS = [0, L(0.09), L(0.27), L(0.36), L(0.486), L(0.53), L(0.70), L(0.91),
+  /* 0.52 — the parhelion's rest: the sky event over the protocol's longest
+     live stretch finally has a station of its own (jury round 10) */
+  const SNAPS = [0, L(0.09), L(0.27), L(0.36), L(0.486), L(0.53), L(0.70), 0.52, L(0.91),
                  0.705, 0.80, 0.865, 0.925, 0.952, 1];
 
   function cardAlpha(p, c) {

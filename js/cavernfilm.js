@@ -16,7 +16,8 @@
      0.782 — the dive releases at 0.778, so the live cavern never peeks
      through the splice; floods out into the whiteout before the vow */
   const FADE_IN = [0.766, 0.782];
-  const FADE_OUT = [0.94, 0.962];
+  const FADE_OUT = [0.955, 0.972];   /* holds fully open through the 0.952 investor rest —
+                                        the ask lands on clean film, the whiteout covers the exit */
   const SCRUB = [0.775, 0.955];
 
   /* bright arctic fog — feather the footage into the page, not into black */

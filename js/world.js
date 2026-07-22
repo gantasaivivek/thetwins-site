@@ -182,13 +182,18 @@ const skyMat = new THREE.ShaderMaterial({
       if (uParhelion > 0.001) {
         float ang = acos(clamp(dot(d, uParhDir), -1.0, 1.0));
         float halo = exp(-pow((ang - 0.384) * 24.0, 2.0));
+        // contrast, not addition: on a sky already near white, added light
+        // clips invisibly (jury-verified sub-threshold by construction) —
+        // so first CARVE a soft dim annulus, then let the halo burn inside it
+        float carve = exp(-pow((ang - 0.384) * 13.0, 2.0));
+        sky *= 1.0 - carve * 0.075 * uParhelion * (1.0 - panoW * 0.35);
         float dogs = halo * exp(-pow((d.y - uParhDir.y) * 7.0, 2.0)) * 1.7;
         float azD = atan(d.z, d.x) - atan(uParhDir.z, uParhDir.x);
         azD = abs(mod(azD + 3.14159265, 6.2831853) - 3.14159265);
         float pillar = exp(-pow(azD * 22.0, 2.0))
                      * (1.0 - smoothstep(0.05, 0.42, abs(d.y - uParhDir.y)));
-        sky += vec3(1.0, 0.965, 0.88)
-             * (halo * 0.17 + dogs * 0.17 + pillar * 0.11)
+        sky += vec3(1.0, 0.93, 0.72)
+             * (halo * 0.30 + dogs * 0.34 + pillar * 0.16)
              * uParhelion * (1.0 - panoW * 0.22);
       }
       // cosmos arm kept for the (retired) space mode
@@ -858,7 +863,11 @@ matTwin.specularIntensity = 1.0;
 matTwin.clearcoat = 0.9;
 matTwin.clearcoatRoughness = 0.15;
 matTwin.iridescence = 0.55;
-matTwin.color = new THREE.Color(0xc2b294);    // champagne gold — the twin's struck-coin cast
+matTwin.color = new THREE.Color(0xd09f4e);    /* struck-coin GOLD — the jury read the old
+                                                 champagne 0xc2b294 as tan clay; this sits on
+                                                 the ratified #c9974a with luminance to survive
+                                                 the transmission wash */
+matTwin.specularColor = new THREE.Color(0xffd9a0);   // warm gold speculars, not white plastic
 matTwin.sheen = 0.6;
 matTwin.sheenColor = new THREE.Color(0xf3ddae);          // gold sheen skimming the facets
 matTwin.emissive = new THREE.Color(0x453312);
@@ -961,7 +970,10 @@ loader.load('assets/models/human-hd.glb',
        renders BLACK whenever its program binds the wrong lights state.
        The lights now live at SCENE level (count constant forever, zero
        recompiles); the drive steers them to the chests each frame. */
-    const light = new THREE.PointLight(lightColor, 0.32, 2.6, 2);
+    /* tight falloff: at distance 2.6 the red ran down the flank and forearm
+       and read as a wound — the light dies within the torso now, the sprite
+       halo carries the visible glow (jury round 10) */
+    const light = new THREE.PointLight(lightColor, 0.32, 1.35, 2.5);
     light.position.set(0.03, 1.27, 0.02);
     scene.add(light);
     nucleus.renderOrder = 12; lobe.renderOrder = 12; halo.renderOrder = 11;
@@ -1213,14 +1225,15 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
     frostGroup.add(pl); frostMats.push(m);
   }
 
-  /* THE HEART, SEALED IN AMBER — a faceted amber-gold jewel at the cube's
-     centre, painted through the ice so it always glows within (the living
-     heart preserved, frozen in amber to hold the century — amber is the
-     vault's own rare accent, and the finale film's blazing gem). */
+  /* THE HEART, SEALED RUBY — a faceted ruby jewel at the cube's centre,
+     painted through the ice so it always glows within. The jury's ruling
+     stands: the vault holds the HUMAN's heart, so the gem carries the one
+     red — the gold stays on the frost glints, the band and the seal ring
+     (the two accents separated, as the cavern film already proves). */
   const gemGeo = new THREE.IcosahedronGeometry(0.145, 0);
   const gemMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffbe5c, metalness: 0.15, roughness: 0.1,
-    emissive: new THREE.Color(0xffa020), emissiveIntensity: 1.0,
+    color: 0xd8233a, metalness: 0.15, roughness: 0.1,
+    emissive: new THREE.Color(0xe01f2e), emissiveIntensity: 1.0,
     flatShading: true, envMapIntensity: 1.6,
     clearcoat: 0.7, clearcoatRoughness: 0.15,
     transparent: true, opacity: 0, depthTest: false
@@ -1230,7 +1243,7 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   hMesh.position.y = 1.32;            // chest height, deep in the monolith's core
   hMesh.rotation.x = 0.35;
   const gemEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xffd18a, transparent: true, opacity: 0,
+    color: 0xff8a76, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
   });
   const gemEdges = new THREE.LineSegments(new THREE.EdgesGeometry(gemGeo), gemEdgeMat);
@@ -1239,7 +1252,7 @@ let monoGeo = null;   // the hewn geometry — the crystal veins seed on its rea
   /* a tight, contained amber halo — the sealed heart's warmth, small (a broad
      warm-white sprite washes to a pale blob) */
   const hGlow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: glowTexture('rgba(255,170,64,0.95)', 'rgba(255,170,64,0)'),
+    map: glowTexture('rgba(255,84,60,0.95)', 'rgba(255,84,60,0)'),
     transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0
   }));
   hGlow.position.y = 1.32;
@@ -1688,16 +1701,25 @@ const ICO = {
   x:       '<svg viewBox="0 0 24 24"><path d="M4.2 4h4.1l4 5.5L17 4h2.6l-6.3 7.8L20.2 20h-4.1l-4.4-6-4.9 6H4.2l6.7-8.2z" fill="currentColor"/></svg>',
   linkedin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="3.2"/><path d="M8 10.4V16M8 7.6v.02M11.6 16v-3.4a2.1 2.1 0 014.2 0V16" stroke-linecap="round"/></svg>'
 };
+/* CATEGORY chips, not brand names — real third-party marks read as claimed
+   live integrations that do not exist yet, and undercut credibility exactly
+   where the site is proving trust (jury round 10). Neutral instrument
+   glyphs for the categories the twin signs into on the human's behalf. */
+ICO.bank   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9.5L12 4l8 5.5M5.5 10v7M9.8 10v7M14.2 10v7M18.5 10v7M4 19.5h16" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+ICO.card   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="6" width="17" height="12.5" rx="2"/><path d="M3.5 10h17"/><path d="M7 15h4" stroke-linecap="round"/></svg>';
+ICO.camera = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8.5 7l1.2-2h4.6l1.2 2H20v12H4V7z" stroke-linejoin="round"/><circle cx="12" cy="12.6" r="3.4"/></svg>';
+ICO.chat   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5.5h16v11H9l-5 4z" stroke-linejoin="round"/><path d="M8 9.5h8M8 12.5h5" stroke-linecap="round"/></svg>';
+ICO.nodes  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="12" r="2.2"/><circle cx="17.5" cy="6" r="2.2"/><circle cx="17.5" cy="18" r="2.2"/><path d="M8 11l7.5-4M8 13l7.5 4"/></svg>';
 const AUTH_APPS = [
-  { name: 'CHASE',     sector: 'FINANCE', svg: ICO.chase },
-  { name: 'BOFA',      sector: 'FINANCE', svg: ICO.bofa },
-  { name: 'STRIPE',    sector: 'FINANCE', svg: ICO.stripe },
-  { name: 'CAL AI',    sector: 'HEALTH',  svg: ICO.calai },
-  { name: 'EQUINOX',   sector: 'HEALTH',  svg: ICO.equinox },
-  { name: 'AETNA',     sector: 'HEALTH',  svg: ICO.aetna },
-  { name: 'INSTAGRAM', sector: 'SOCIAL',  svg: ICO.insta },
-  { name: 'X',         sector: 'SOCIAL',  svg: ICO.x },
-  { name: 'LINKEDIN',  sector: 'SOCIAL',  svg: ICO.linkedin }
+  { name: 'BANKING',   sector: 'FINANCE', svg: ICO.bank },
+  { name: 'PAYMENTS',  sector: 'FINANCE', svg: ICO.card },
+  { name: 'LEDGER',    sector: 'FINANCE', svg: ICO.stripe },
+  { name: 'NUTRITION', sector: 'HEALTH',  svg: ICO.calai },
+  { name: 'FITNESS',   sector: 'HEALTH',  svg: ICO.equinox },
+  { name: 'COVERAGE',  sector: 'HEALTH',  svg: ICO.aetna },
+  { name: 'SOCIAL',    sector: 'SOCIAL',  svg: ICO.camera },
+  { name: 'MESSAGES',  sector: 'SOCIAL',  svg: ICO.chat },
+  { name: 'NETWORK',   sector: 'SOCIAL',  svg: ICO.nodes }
 ];
 /* auth-beat geometry cache: the panel's size and each chip's offset within it
    are static for the whole beat — measured once on entry (and re-measured
@@ -1713,7 +1735,7 @@ const authNet = (() => {
    digital twin is the agent that signs into every service on the human's behalf */
 const authHead = document.createElement('div');
 authHead.className = 'auth-head';
-authHead.innerHTML = `<div class="auth-eyebrow">////// VERIFY_03</div><div class="auth-title">AUTHORIZED SERVICES</div>`;
+authHead.innerHTML = `<div class="auth-eyebrow">////// PROTOCOL_03 · SERVICES</div><div class="auth-title">AUTHORIZED SERVICES</div>`;
 authNet.appendChild(authHead);
 const AUTH_SECTORS = ['FINANCE', 'HEALTH', 'SOCIAL'];
 const appChips = [];
@@ -2371,9 +2393,12 @@ function seatCavPlate(item, P, W, H, isDecl) {
   let x = (_cproj.x * 0.5 + 0.5) * W - el._pw / 2;
   let y = (-_cproj.y * 0.5 + 0.5) * H - el._ph / 2;
   if (!isDecl && W < H * 0.8) {
-    /* portrait: the plate seats BELOW the heart's band — centered plates
-       were hiding the film's one sacred object for the whole chamber act */
-    y = Math.max(y, H * 0.40);
+    /* portrait: DOCK the plate as a bottom sheet — the heart owns the whole
+       upper two-thirds. The old y >= 0.40H still centred the card over the
+       ruby at the 0.865 rest and buried the film's one sacred object on the
+       phone (jury round 10); the money shot now reads clean above it. */
+    x = (W - el._pw) / 2;                       // centre the sheet across the base
+    y = H - el._ph - Math.max(58, H * 0.085);   // clear the fixed HUD telemetry row
   }
   if (isDecl) {
     /* the declarations float, but never off the page (mobile clipped them
@@ -2829,7 +2854,10 @@ function update(time) {
     /* live instrument readouts */
     if (telBpm) telBpm.textContent = `${64 + Math.round(hb * 6)} BPM`;
   }
-  if (telYr) telYr.textContent = `${Math.round(moat * 100)} YR`;
+  /* the readout reaches the NAMESAKE number at the rest: moat eases to
+     ~0.97 on the frame visitors dwell on, and "SEALED 98 YR" two lines
+     above "held for a hundred years" broke the fiction (jury round 10) */
+  if (telYr) telYr.textContent = `${Math.min(100, Math.round(moat * 103))} YR`;
 
   /* figures: the human is the constant; the twin is cast from it, sealed
      back into it before the deconstruction, and re-emerges at the finale. */
@@ -3055,7 +3083,10 @@ function update(time) {
       const yLift = 0;
       const y = (b.ringY + yLift) * (1 - facetRise) - facetSink * 1.4
         + Math.sin(time * 0.5 + b.seed) * 0.06;
-      const rr = RING_R * 1.32;
+      /* matter hand-off: as the facets sink they also CONVERGE on the spot
+         where the vault will rise — the protocol folds itself into the cube
+         instead of five relics silently vanishing (jury round 10) */
+      const rr = RING_R * 1.32 * (1 - facetSink * 0.82);
       b.mesh.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr);
       _proj.copy(b.mesh.position).project(camera);      // re-seat after the crown step
       b.sx = (_proj.x * 0.5 + 0.5) * W2;
@@ -3079,7 +3110,11 @@ function update(time) {
       b._ly = Math.max(70, Math.min(H2 - 140, b.sy - 92));
       /* the label lives and dies WITH its emblem — orphaned sky labels were
          hanging over the range after the facets dissolved */
-      b._op = op * (hovered ? 1 : 0.55) * duck;
+      /* …and it NEVER prints over the signature film: the DOM labels ride
+         above the film canvas, so they hold until the seal's legacy-0.522
+         exit even though the emblems are already rising beneath (jury) */
+      const sealGate = seg(p, 0.518, 0.528);
+      b._op = op * (hovered ? 1 : 0.55) * duck * sealGate;
       b._hov = hovered;
     }
     /* label separation — two blocks can project into the same column; the
@@ -3631,7 +3666,10 @@ function update(time) {
     seg(p, 0.035, 0.065) * (1 - seg(p, 0.11, 0.14)),      // THE HUMAN (after the hero clears)
     seg(p, 0.23, 0.26) * (1 - seg(p, 0.29, 0.32)),        // THE DIGITAL TWIN
     seg(p, 0.32, 0.35) * (1 - seg(p, 0.38, 0.41)),        // HUMAN-VERIFIED (before the seal + film)
-    seg(p, 0.885, 0.905) * (1 - seg(p, 0.93, 0.945)),     // CENTENNIAL MOAT (clears before whiteout)
+    seg(p, 0.900, 0.912) * (1 - seg(p, 0.93, 0.945)),     /* CENTENNIAL MOAT — in only once the
+                                                             cube has presence (its 10%-opacity ghost
+                                                             was bleeding into the range at 057%);
+                                                             fully lit by the 0.5885 rest */
     explore                                               // THE PROTOCOL (explore caption)
   ];
   for (let i = 0; i < labels.length; i++) {

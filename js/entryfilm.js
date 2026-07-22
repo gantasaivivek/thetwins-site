@@ -73,15 +73,34 @@
 
   const easeOut = t => 1 - Math.pow(1 - t, 3);   // fast fall, decelerated landing
 
-  function draw(idx, a) {
+  function draw(idx, a, t) {
     ctx.clearRect(0, 0, W, H);
     const img = nearestFrame(idx);
     if (!img) return;
     const vr = img.width / img.height, cr = W / H;
     let dw, dh;
     if (cr > vr) { dw = W; dh = W / vr; } else { dw = H * vr; dh = H; }
+    /* continuity lift: the generated mid-fall graded a stop darker and cooler
+       (steel-blue) than the loader-white before and the sunlit hero after —
+       the only frame that left the polar-day key. Ease a brightness+warmth
+       lift that peaks in the middle and vanishes at both ends, so the fall
+       stays inside one day (jury round 10). */
+    const mid = t != null ? Math.sin(Math.min(1, Math.max(0, t)) * Math.PI) : 0;
+    ctx.filter = mid > 0.001
+      ? `brightness(${(1 + 0.16 * mid).toFixed(3)}) saturate(${(1 - 0.06 * mid).toFixed(3)})`
+      : 'none';
     ctx.globalAlpha = a;
     ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.filter = 'none';
+    /* a whisper of warm daylight over the cool blues — soft-light keeps the
+       whites clean while pulling the mid-tones off steel */
+    if (mid > 0.001) {
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.globalAlpha = a * 0.22 * mid;
+      ctx.fillStyle = 'rgb(255,232,196)';
+      ctx.fillRect((W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.globalAlpha = 1;
   }
 
@@ -100,7 +119,7 @@
       alpha -= dt * 2.2;
       if (alpha <= 0) { done = true; canvas.remove(); return; }
     }
-    draw(idx, Math.max(0, Math.min(1, alpha)));
+    draw(idx, Math.max(0, Math.min(1, alpha)), t);
   }
 
   addEventListener('resize', resize);

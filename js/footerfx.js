@@ -216,12 +216,14 @@
         p.vx *= 0.86; p.vy *= 0.86;
       } else {
         // idle: a quiet orbital halo — banded rings drifting around the
-        // centre (the old figure-eight read as scribbles, not a system)
-        const band = 0.55 + 0.45 * Math.sin(p.seed * 7.3);          // ring radius per particle
+        // centre (the old figure-eight read as scribbles, not a system).
+        // Tightened so the ring stays a contained halo between the footer
+        // columns instead of a formless scatter over the links (jury r10).
+        const band = 0.62 + 0.38 * Math.sin(p.seed * 7.3);          // ring radius per particle
         const a = t * (0.05 + 0.06 * Math.sin(p.seed * 3.1)) + p.seed * Math.PI * 2;
         const wobble = 1 + 0.05 * Math.sin(t * 0.5 + p.seed * 9.0); // rings breathe
-        const txp = cx + Math.cos(a) * W * 0.30 * band * wobble;
-        const typ = cy + Math.sin(a) * H * 0.24 * band * wobble;
+        const txp = cx + Math.cos(a) * W * 0.205 * band * wobble;
+        const typ = cy + Math.sin(a) * H * 0.185 * band * wobble;
         p.vx += (txp - p.x) * 0.0018 * dt;
         p.vy += (typ - p.y) * 0.0018 * dt;
         p.vx *= 0.95; p.vy *= 0.95;
@@ -239,7 +241,9 @@
       } else {
         r = 108 + 118 * speed; g = 114 + 52 * speed; b = 128 - 52 * speed;
       }
-      const alpha = 0.35 + speed * 0.5 + glow * 0.2;
+      /* idle particles sit quieter so the ring reads as a halo, not a haze
+         over the links; the morph surge (glow) still brightens them */
+      const alpha = (targets ? 0.35 : 0.22) + speed * 0.5 + glow * 0.2;
       ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha.toFixed(3)})`;
       const s = (1 + speed * 1.6) * (1 + glow * 0.7) * dpr;
       ctx.fillRect(p.x, p.y, s, s);
@@ -248,9 +252,11 @@
     /* the morph surge — one soft radial flash under the swarm */
     if (glow > 0.03) {
       const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, scale * 1.25);
-      const tint = warm ? '255,122,92' : '159,224,255';
+      /* warm = human red; otherwise the twin's GOLD signal — the old cyan
+         157,224,255 was a retired-hue survivor in the flash (jury r10) */
+      const tint = warm ? '255,122,92' : '217,168,78';
       gr.addColorStop(0, `rgba(${tint},${(glow * 0.16).toFixed(3)})`);
-      gr.addColorStop(1, 'rgba(159,224,255,0)');
+      gr.addColorStop(1, `rgba(${tint},0)`);
       ctx.fillStyle = gr;
       ctx.fillRect(cx - scale * 1.25, cy - scale * 1.25, scale * 2.5, scale * 2.5);
     }

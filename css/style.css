@@ -615,8 +615,10 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   transition: opacity 0.5s ease;
   will-change: transform, opacity;
 }
-.auth-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #5b6675; margin-bottom: 5px; }
-.auth-title { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: #23272e; line-height: 1.3; }
+/* both lines carry the same frost scrim as the .anno cards so they seat on
+   the bright ice instead of floating low-contrast (jury round 10) */
+.auth-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #47505c; margin-bottom: 5px; text-shadow: 0 0 10px rgba(238, 243, 250, 0.9); }
+.auth-title { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: #23272e; line-height: 1.3; text-shadow: 0 0 12px rgba(238, 243, 250, 0.85); }
 .auth-head { margin-bottom: 1px; }
 .auth-meta {
   align-self: stretch; margin-top: 3px; padding-top: 9px;
@@ -1275,6 +1277,17 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   margin-bottom: 4px;
 }
 .footer-col a, .footer-links a { opacity: 0.78; width: fit-content; }
+/* coming-soon resource entries — present in the read, honestly not-yet-live,
+   never a link that 404s in a new tab (jury round 10) */
+.footer-soon {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: fit-content; opacity: 0.5; cursor: default;
+}
+.footer-soon em {
+  font-style: normal; font-size: 7.5px; letter-spacing: 0.16em;
+  padding: 1px 5px; border: 1px solid rgba(76, 79, 83, 0.3); border-radius: 3px;
+  opacity: 0.7;
+}
 
 /* social icon row */
 .footer-social {
@@ -1313,13 +1326,18 @@ a:focus-visible, button:focus-visible, input:focus-visible {
 .footer-meta {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;             /* children size to content — the CTA was stretching
+                                        full-width and wrapping into a broken two-line box */
   gap: 10px;
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 1;                        /* the primary CTA must NOT inherit a dim — the quiet
+                                        lines carry their own reduced opacity individually */
   text-align: right;
 }
+/* the ambient legal/coordinate lines recede; the CTA and vow stay at full ink */
+.footer-meta > div:not([class]) { opacity: 0.55; }
 /* credits — quiet, structured, at the very end of the read */
 .footer-credits {
   display: flex;
@@ -1515,6 +1533,8 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   color: var(--slate-dark);
   border: 1px solid rgba(76, 79, 83, 0.35);
   border-radius: 2px;
+  white-space: nowrap;               /* the label is one line, always */
+  align-self: flex-end;
   touch-action: manipulation;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
@@ -1777,8 +1797,15 @@ body.inworld #investors,
 body.inworld #manifesto { display: none; }
 
 @media (max-width: 640px) {
-  .plate { width: min(320px, 88vw); padding: 16px 18px 14px; }
-  .pspec .pcount { font-size: 24px; }
+  .plate { width: min(340px, 90vw); padding: 14px 16px 12px; }
+  /* the cavern MOAT plate docks as a compact bottom sheet — keep it short so
+     the ruby holds the upper two-thirds and the HUD row stays clear (jury) */
+  #plate-specs h2 { font-size: 15px; margin-bottom: 8px; }
+  #plate-specs .plate-index { margin-bottom: 6px; }
+  #plate-specs .plate-specs { gap: 8px 16px; }
+  .pspec .pcount { font-size: 22px; }
+  .pspec i { font-size: 9px; margin-top: 2px; }
+  .pspec em { font-size: 9px; }
   /* the persuasion copy reads at phone arm's length — plates included */
   .plate p, .plate li, .plate .plate-beings li, .plate .plate-phases li { font-size: 13.5px; line-height: 1.6; }
   .decl { font-size: 14px; max-width: min(320px, 86vw); }
